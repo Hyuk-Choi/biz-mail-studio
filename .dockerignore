@@ -1,0 +1,11 @@
+.next
+.tools
+node_modules
+.env
+.env.local
+.env*.local
+Dockerfile
+README.md
+*.log
+.DS_Store
+tsconfig.tsbuildinfo
