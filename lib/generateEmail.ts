@@ -177,7 +177,12 @@ function listSentence(content: MailContent, language: OutputLanguage) {
     return details[0];
   }
 
-  return details.map((detail) => `- ${detail}`).join("\n");
+  const intro =
+    language === "ko"
+      ? "아래 내용을 확인 부탁드립니다."
+      : "Please see the key details below:";
+
+  return [intro, ...details.map((detail) => `- ${detail}`)].join("\n");
 }
 
 function closingRequest(language: OutputLanguage, tone: MailTone) {
@@ -204,29 +209,13 @@ function closingRequest(language: OutputLanguage, tone: MailTone) {
   return "검토 후 가능하신 방향이나 의견을 회신해주시면 감사하겠습니다.";
 }
 
-function addAdditionalRequest(
-  sections: string[],
-  content: MailContent,
-  language: OutputLanguage,
-) {
-  if (!content.additionalRequests) {
-    return;
-  }
-
-  sections.push(
-    language === "ko"
-      ? `추가 요청사항: ${content.additionalRequests}`
-      : `Additional request: ${content.additionalRequests}`,
-  );
-}
-
 function buildSection(
   template: SectionTemplate,
   content: MailContent,
   tone: MailTone,
   variant: number,
 ) {
-  return `${template.title}\n${template.build(content, tone, variant)}`;
+  return template.build(content, tone, variant);
 }
 
 const caseTemplates: Record<MailCase, CaseTemplate> = {
@@ -912,6 +901,19 @@ function getSignOff(language: OutputLanguage, tone: MailTone) {
   return "감사합니다.";
 }
 
+function buildKoreanSubjectVariants(purpose: string, concise: boolean) {
+  const base = purpose.trim();
+  const primary = /(요청|제안|문의|보고|공유)$/.test(base)
+    ? `${base}드립니다`
+    : `${base} 건 확인 부탁드립니다`;
+
+  return [
+    concise ? `${base} 확인 부탁드립니다` : primary,
+    `${base} 건 검토 부탁드립니다`,
+    `${base} 관련 공유드립니다`,
+  ];
+}
+
 function buildBody(
   input: MailFormInput,
   language: OutputLanguage,
@@ -924,8 +926,6 @@ function buildBody(
     buildSection(template, content, tone, variant),
   );
 
-  addAdditionalRequest(sections, content, language);
-
   const intro =
     language === "en"
       ? variant % 2 === 1
@@ -937,11 +937,12 @@ function buildBody(
 
   const shortMode = tone === "concise";
   const visibleSections = shortMode ? sections.slice(0, 3) : sections;
+  const greeting = getGreeting(content, language, tone);
+  const shouldShowIntro = !(language === "ko" && greeting === "안녕하세요.");
 
   return [
-    getGreeting(content, language, tone),
-    "",
-    intro,
+    greeting,
+    ...(shouldShowIntro ? ["", intro] : []),
     "",
     visibleSections.join("\n\n"),
     "",
@@ -965,13 +966,9 @@ function buildSubjects(
       ? [
           `Regarding ${purpose}`,
           concise ? `${purpose} - Quick Follow-up` : `Follow-up on ${purpose}`,
-          `${outputCaseLabel}: Request for Review`,
+          `Request for Review: ${purpose}`,
         ]
-      : [
-          `[${mailCaseLabel}] ${purpose}`,
-          concise ? `${purpose} 확인 요청` : `${purpose} 관련 검토 요청드립니다`,
-          `${mailCaseLabel} 관련 문의드립니다`,
-        ];
+      : buildKoreanSubjectVariants(purpose, concise);
 
   if (variant % 2 === 1) {
     return [variants[1], variants[0], variants[2]];
