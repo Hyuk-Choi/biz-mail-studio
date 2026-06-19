@@ -21,8 +21,8 @@ BizMail Studio는 사용자가 말하듯 작성한 메일 초안이나 메모를
 - 추천 제목 3개, 완성된 메일 본문, 개선 포인트, 누락 정보 안내 생성
 - 결과 재작성 옵션: 더 정중하게, 더 짧게, 더 명확하게, 더 부드럽게, 더 단호하게, 영어로 바꾸기, 한국어로 바꾸기, 다시 생성
 - 결과 복사 및 복사 완료 피드백
-- OpenAI API 서버 연동 구조
-- OpenAI API Key가 없을 때 개발용 mock fallback 지원
+- 현재 포트폴리오/데모 모드는 mock 생성 로직으로 동작
+- 추후 OpenAI API 서버 연동 가능 구조
 
 ## 기술 스택
 
@@ -115,12 +115,18 @@ Next.js 앱이므로 Vercel 배포가 가장 간단합니다.
 4. Environment Variables에 아래 값을 등록합니다.
 
 ```bash
+MAIL_GENERATION_PROVIDER=mock
+```
+
+5. Deploy를 실행합니다.
+
+OpenAI API로 전환할 때만 아래 값을 추가하고 `MAIL_GENERATION_PROVIDER=openai`로 변경합니다.
+
+```bash
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4o-mini
 MAIL_GENERATION_PROVIDER=openai
 ```
-
-5. Deploy를 실행합니다.
 
 이 프로젝트에는 Vercel 배포용 [vercel.json](./vercel.json)이 포함되어 있습니다.
 
@@ -131,9 +137,7 @@ Render를 사용하는 경우 저장소를 연결한 뒤 `render.yaml` Blueprint
 필수 환경변수:
 
 ```bash
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4o-mini
-MAIL_GENERATION_PROVIDER=openai
+MAIL_GENERATION_PROVIDER=mock
 ```
 
 ### Docker 배포
@@ -143,9 +147,7 @@ MAIL_GENERATION_PROVIDER=openai
 ```bash
 docker build -t bizmail-studio .
 docker run -p 3000:3000 \
-  -e OPENAI_API_KEY=your_openai_api_key \
-  -e OPENAI_MODEL=gpt-4o-mini \
-  -e MAIL_GENERATION_PROVIDER=openai \
+  -e MAIL_GENERATION_PROVIDER=mock \
   bizmail-studio
 ```
 
@@ -168,16 +170,18 @@ cloudflared tunnel --protocol http2 --url http://127.0.0.1:3001
 `.env.local.example`을 참고해 `.env.local` 파일을 생성합니다.
 
 ```bash
+MAIL_GENERATION_PROVIDER=mock
+
+# Optional later, only when switching to OpenAI.
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4o-mini
-MAIL_GENERATION_PROVIDER=openai
 ```
 
 환경변수 설명:
 
-- `OPENAI_API_KEY`: OpenAI API 호출에 사용하는 서버 전용 키입니다.
-- `OPENAI_MODEL`: 사용할 OpenAI 모델명입니다.
-- `MAIL_GENERATION_PROVIDER`: `openai` 또는 `mock`을 사용할 수 있습니다.
+- `MAIL_GENERATION_PROVIDER`: 현재는 `mock`으로 사용합니다. `openai`로 바꾸면 서버에서 OpenAI API를 호출합니다.
+- `OPENAI_API_KEY`: OpenAI API 호출에 사용하는 서버 전용 키입니다. mock 모드에서는 필요 없습니다.
+- `OPENAI_MODEL`: 사용할 OpenAI 모델명입니다. mock 모드에서는 필요 없습니다.
 
 API Key는 클라이언트 코드에 포함되지 않으며, `app/api/mail/generate/route.ts` 서버 라우트에서만 사용됩니다.
 
