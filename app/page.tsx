@@ -5,6 +5,7 @@ import CaseCards from "@/components/CaseCards";
 import Header from "@/components/Header";
 import MailForm from "@/components/MailForm";
 import MailResult from "@/components/MailResult";
+import { getMailTemplateById } from "@/data/mailTemplates";
 import { requestMailGeneration } from "@/lib/mailApiClient";
 import type {
   GeneratedMailResult,
@@ -14,6 +15,7 @@ import type {
 
 const initialInput: MailFormInput = {
   mailCase: "work_request",
+  mailTemplateId: "work-request",
   language: "ko_business",
   tone: "polite",
   recipient: "",
@@ -74,6 +76,8 @@ export default function Home() {
     }
   };
 
+  const selectedTemplate = getMailTemplateById(formInput.mailTemplateId);
+
   return (
     <main className="min-h-screen bg-slate-50">
       <Header />
@@ -88,6 +92,7 @@ export default function Home() {
         />
         <MailResult
           result={result}
+          selectedTemplate={selectedTemplate}
           isGenerating={isGenerating}
           message={resultMessage}
           onRefine={handleGenerate}

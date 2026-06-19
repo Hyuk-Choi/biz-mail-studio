@@ -1,4 +1,8 @@
 import { mailCases, toneOptions } from "@/data/mailOptions";
+import {
+  getMailTemplateById,
+  templateToMailCaseMap,
+} from "@/data/mailTemplates";
 import type {
   GenerateEmailOptions,
   GeneratedMailResult,
@@ -6,6 +10,7 @@ import type {
   MailFormInput,
   MailLanguage,
   MailRefinementAction,
+  MailTemplate,
   MailTone,
 } from "@/types/mail";
 
@@ -118,6 +123,7 @@ function isEnglishOutput(language: MailLanguage) {
 function resolveOutputLanguage(
   language: MailLanguage,
   action?: MailRefinementAction,
+  template?: MailTemplate,
 ): OutputLanguage {
   if (action === "translate_to_english") {
     return "en";
@@ -125,6 +131,10 @@ function resolveOutputLanguage(
 
   if (action === "translate_to_korean") {
     return "ko";
+  }
+
+  if (template?.id === "global-business") {
+    return "en";
   }
 
   return isEnglishOutput(language) ? "en" : "ko";
@@ -156,6 +166,10 @@ function buildContent(input: MailFormInput): MailContent {
   };
 }
 
+function resolveMailCase(input: MailFormInput): MailCase {
+  return templateToMailCaseMap[input.mailTemplateId] ?? input.mailCase;
+}
+
 function detailList(content: MailContent, language: OutputLanguage) {
   const details = [...content.keyPoints];
 
@@ -183,6 +197,27 @@ function listSentence(content: MailContent, language: OutputLanguage) {
       : "Please see the key details below:";
 
   return [intro, ...details.map((detail) => `- ${detail}`)].join("\n");
+}
+
+function detailBulletList(
+  content: MailContent,
+  language: OutputLanguage,
+  intro: string,
+) {
+  const details = detailList(content, language);
+  return [intro, ...details.map((detail) => `- ${detail}`)].join("\n");
+}
+
+function cleanSubjectTopic(value: string) {
+  const trimmed = value.trim();
+  const cleaned = trimmed
+    .replace(
+      /\s*(관련)?\s*(전달|공유|확인|검토|회신)?\s*(요청|문의|보고|제안|공유)\s*(드립니다|드려요|부탁드립니다)?$/,
+      "",
+    )
+    .trim();
+
+  return cleaned.length >= 2 ? cleaned : trimmed;
 }
 
 function closingRequest(language: OutputLanguage, tone: MailTone) {
@@ -502,12 +537,13 @@ const caseTemplates: Record<MailCase, CaseTemplate> = {
     ko: [
       {
         title: "필요한 자료",
-        build: (content) => listSentence(content, "ko"),
+        build: (content) =>
+          detailBulletList(content, "ko", "필요한 자료와 요청 사항은 아래와 같습니다."),
       },
       {
         title: "사용 목적",
         build: (content) =>
-          `${withKoreanParticle(content.purpose, "업무 검토", "을", "를")} 위해 해당 자료가 필요합니다.`,
+          `${cleanSubjectTopic(sentence(content.purpose, "관련 업무"))} 관련 업무 진행을 위해 해당 자료가 필요합니다.`,
       },
       {
         title: "요청 기한",
@@ -914,6 +950,21 @@ function buildKoreanSubjectVariants(purpose: string, concise: boolean) {
   ];
 }
 
+function buildSubjectFromPattern(
+  template: MailTemplate,
+  purpose: string,
+  language: OutputLanguage,
+) {
+  const fallback = language === "en" ? "the requested topic" : "관련 건";
+  const subject = template.subjectPattern
+    .replace(/\{[^}]+\}/g, purpose || fallback)
+    .replace(/^\[Subject\]\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return subject || "";
+}
+
 function buildBody(
   input: MailFormInput,
   language: OutputLanguage,
@@ -921,7 +972,8 @@ function buildBody(
   variant: number,
 ) {
   const content = buildContent(input);
-  const templates = caseTemplates[input.mailCase][language];
+  const mailCase = resolveMailCase(input);
+  const templates = caseTemplates[mailCase][language];
   const sections = templates.map((template) =>
     buildSection(template, content, tone, variant),
   );
@@ -956,19 +1008,32 @@ function buildSubjects(
   tone: MailTone,
   variant: number,
 ) {
-  const mailCaseLabel = optionLabel(mailCases, input.mailCase);
+  const template = getMailTemplateById(input.mailTemplateId);
+  const mailCase = resolveMailCase(input);
+  const mailCaseLabel = optionLabel(mailCases, mailCase);
   const outputCaseLabel =
-    language === "en" ? englishCaseLabels[input.mailCase] : mailCaseLabel;
+    language === "en" ? englishCaseLabels[mailCase] : mailCaseLabel;
   const purpose = sentence(input.purpose, outputCaseLabel);
+  const subjectTopic = cleanSubjectTopic(purpose);
   const concise = tone === "concise";
+  const patternSubject = buildSubjectFromPattern(
+    template,
+    subjectTopic,
+    language,
+  );
   const variants =
     language === "en"
       ? [
-          `Regarding ${purpose}`,
-          concise ? `${purpose} - Quick Follow-up` : `Follow-up on ${purpose}`,
-          `Request for Review: ${purpose}`,
+          patternSubject || `Regarding ${subjectTopic}`,
+          concise
+            ? `${subjectTopic} - Quick Follow-up`
+            : `Follow-up on ${subjectTopic}`,
+          `Request for Review: ${subjectTopic}`,
         ]
-      : buildKoreanSubjectVariants(purpose, concise);
+      : [
+          patternSubject,
+          ...buildKoreanSubjectVariants(subjectTopic, concise),
+        ].filter(Boolean);
 
   if (variant % 2 === 1) {
     return [variants[1], variants[0], variants[2]];
@@ -984,10 +1049,11 @@ function buildImprovements(
   action?: MailRefinementAction,
 ) {
   const toneLabel = optionLabel(toneOptions, tone);
-  const mailCaseLabel = optionLabel(mailCases, input.mailCase);
+  const template = getMailTemplateById(input.mailTemplateId);
+  const mailCase = resolveMailCase(input);
 
   if (language === "en") {
-    const outputCaseLabel = englishCaseLabels[input.mailCase];
+    const outputCaseLabel = englishCaseLabels[mailCase];
     const outputToneLabel = englishToneLabels[tone];
     const actionNote =
       action === "translate_to_english"
@@ -995,7 +1061,7 @@ function buildImprovements(
         : "Used clear business English instead of direct, literal phrasing.";
 
     return [
-      `Restructured the message for the selected case: ${outputCaseLabel}.`,
+      `Restructured the message for the selected template: ${template.label} (${outputCaseLabel}).`,
       `Adjusted the tone to ${outputToneLabel}.`,
       actionNote,
       "Kept the content limited to the details provided by the user.",
@@ -1008,7 +1074,7 @@ function buildImprovements(
       : "정중하지만 과하게 딱딱하지 않은 문장으로 다듬었습니다.";
 
   return [
-    `${mailCaseLabel} 흐름에 맞춰 본문 구조를 재정리했습니다.`,
+    `${template.label} 폼의 흐름(${template.structure.join(" -> ")})에 맞춰 본문 구조를 재정리했습니다.`,
     `${toneLabel} 톤에 맞춰 표현 강도를 조정했습니다.`,
     actionNote,
     "입력된 정보 외의 사실은 임의로 추가하지 않았습니다.",
@@ -1019,8 +1085,9 @@ export async function generateMockEmail(
   input: MailFormInput,
   options: GenerateEmailOptions = {},
 ): Promise<GeneratedMailResult> {
+  const template = getMailTemplateById(input.mailTemplateId);
   const tone = resolveTone(input.tone, options.action);
-  const language = resolveOutputLanguage(input.language, options.action);
+  const language = resolveOutputLanguage(input.language, options.action, template);
   const variant = options.variant ?? 0;
 
   const subjects = buildSubjects(input, language, tone, variant);

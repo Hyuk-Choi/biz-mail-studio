@@ -1,10 +1,15 @@
 "use client";
 
 import CopyButton from "@/components/CopyButton";
-import type { GeneratedMailResult, MailRefinementAction } from "@/types/mail";
+import type {
+  GeneratedMailResult,
+  MailRefinementAction,
+  MailTemplate,
+} from "@/types/mail";
 
 interface MailResultProps {
   result: GeneratedMailResult | null;
+  selectedTemplate: MailTemplate;
   isGenerating: boolean;
   message?: string;
   onRefine: (action: MailRefinementAction) => void;
@@ -37,6 +42,7 @@ function formatResultForCopy(result: GeneratedMailResult) {
 
 export default function MailResult({
   result,
+  selectedTemplate,
   isGenerating,
   message = "",
   onRefine,
@@ -80,7 +86,7 @@ export default function MailResult({
       {isGenerating ? (
         <div className="grid gap-4">
           <div className="rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
-            선택한 케이스와 톤에 맞춰 메일을 정리하고 있습니다.
+            선택한 메일 폼과 톤에 맞춰 메일을 정리하고 있습니다.
           </div>
           <div className="h-20 animate-pulse rounded-md bg-slate-100" />
           <div className="h-64 animate-pulse rounded-md bg-slate-100" />
@@ -88,6 +94,20 @@ export default function MailResult({
         </div>
       ) : result ? (
         <div className="grid gap-6">
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-slate-900">
+                적용된 메일 폼
+              </span>
+              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                {selectedTemplate.label}
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {selectedTemplate.structure.join(" -> ")}
+            </p>
+          </div>
+
           <div>
             <h3 className="text-sm font-semibold text-slate-700">추천 제목</h3>
             <ul className="mt-3 grid gap-2">
@@ -135,7 +155,7 @@ export default function MailResult({
               아직 작성된 메일이 없습니다.
             </p>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              왼쪽 입력 영역에 목적이나 초안을 입력한 뒤 메일을 작성해보세요.
+              왼쪽 입력 영역에서 메일 폼을 고르고 목적이나 초안을 입력한 뒤 작성해보세요.
             </p>
           </div>
         </div>

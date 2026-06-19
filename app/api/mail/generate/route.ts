@@ -33,6 +33,7 @@ function isMailFormInput(value: unknown): value is MailFormInput {
 
   return (
     isString(input.mailCase) &&
+    isString(input.mailTemplateId) &&
     isString(input.language) &&
     isString(input.tone) &&
     isString(input.recipient) &&

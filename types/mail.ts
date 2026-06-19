@@ -41,6 +41,36 @@ export type MailRefinementAction =
   | "translate_to_korean"
   | "regenerate";
 
+export type MailTemplateId =
+  | "work-request"
+  | "schedule-adjustment"
+  | "meeting-request"
+  | "meeting-follow-up"
+  | "proposal"
+  | "collaboration"
+  | "quotation-request"
+  | "document-request"
+  | "reply-reminder"
+  | "thanks"
+  | "apology"
+  | "rejection"
+  | "complaint"
+  | "report"
+  | "self-introduction"
+  | "global-business";
+
+export type MailTemplate = {
+  id: MailTemplateId;
+  label: string;
+  description: string;
+  recommendedTone: string;
+  subjectPattern: string;
+  structure: string[];
+  guideQuestions: string[];
+  koreanExample: string;
+  englishExample?: string;
+};
+
 export interface MailOption<T extends string> {
   id: T;
   label: string;
@@ -49,6 +79,7 @@ export interface MailOption<T extends string> {
 
 export interface MailFormInput {
   mailCase: MailCase;
+  mailTemplateId: MailTemplateId;
   language: MailLanguage;
   tone: MailTone;
   recipient: string;

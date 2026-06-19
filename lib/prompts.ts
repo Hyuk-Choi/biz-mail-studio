@@ -1,5 +1,11 @@
-import { languageOptions, mailCases, toneOptions } from "@/data/mailOptions";
-import type { GenerateEmailOptions, MailFormInput, MailRefinementAction } from "@/types/mail";
+import { languageOptions, toneOptions } from "@/data/mailOptions";
+import { getMailTemplateById } from "@/data/mailTemplates";
+import type {
+  GenerateEmailOptions,
+  MailFormInput,
+  MailRefinementAction,
+  MailTemplate,
+} from "@/types/mail";
 
 function findLabel<T extends string>(
   options: Array<{ id: T; label: string }>,
@@ -60,11 +66,10 @@ export function createSystemPrompt() {
   ].join("\n");
 }
 
-export function createUserPrompt(
+export function buildBusinessMailPrompt(
   input: MailFormInput,
-  options: GenerateEmailOptions = {},
+  template: MailTemplate,
 ) {
-  const mailCase = findLabel(mailCases, input.mailCase);
   const language = findLabel(languageOptions, input.language);
   const tone = findLabel(toneOptions, input.tone);
 
@@ -72,9 +77,14 @@ export function createUserPrompt(
     "Please rewrite the following input into a polished business email.",
     "",
     "Selected options:",
-    `- Mail case: ${mailCase}`,
+    `- Selected mail template: ${template.label}`,
+    `- Template description: ${template.description}`,
+    `- Recommended template tone: ${template.recommendedTone}`,
     `- Language mode: ${language}`,
     `- Tone: ${tone}`,
+    `- Subject pattern reference: ${template.subjectPattern}`,
+    `- Internal structure to follow: ${template.structure.join(" -> ")}`,
+    `- Guide questions: ${template.guideQuestions.join(" / ")}`,
     "",
     "User-provided information:",
     `- Recipient: ${emptySafe(input.recipient)}`,
@@ -82,19 +92,39 @@ export function createUserPrompt(
     `- Must-include details: ${emptySafe(input.keyPoints)}`,
     `- Original draft: ${emptySafe(input.draft)}`,
     `- Additional requests: ${emptySafe(input.additionalRequests)}`,
-    `- Refinement request: ${refinementInstruction(options.action)}`,
-    `- Variant number: ${options.variant ?? 0}`,
     "",
     "Writing instructions:",
-    "- Match the structure to the selected mail case.",
-    "- Use the selected mail case only as an internal writing structure; do not print section labels in the final body.",
+    "- Preserve the user's original intent and business objective.",
+    "- Match the body flow to the selected template structure.",
+    "- Use the selected template only as an internal writing structure; do not print section labels in the final body.",
     "- Keep the user's facts intact and do not add unsupported details.",
-    "- Make the main request or next action clear.",
-    "- Produce a complete send-ready email with greeting, natural paragraphs, clear request, and closing.",
+    "- Do not invent names, dates, deadlines, prices, attachments, promises, decisions, or commitments.",
+    "- If information is missing or uncertain, use general wording instead of guessing.",
+    "- Make the main request, next action, deadline, or expected reply clear.",
+    "- Produce a complete send-ready email with greeting, natural paragraphs, clear request or update, and closing.",
+    "- Separate the output into subjects, body, and improvements in JSON only.",
     "- Do not include labels such as 요청 배경, 요청 내용, 기한/액션, Context, Request, or Additional request in the body.",
+    "- Do not include analysis, explanations, template names, or guide questions in the final body.",
     "- If writing in English, use concise and natural global business expressions.",
+    "- If writing in English, avoid literal Korean-to-English translation and use appropriate openings/closings such as Dear, Hi, and Best regards.",
     "- If writing in Korean, use polite and professional phrasing that still feels natural.",
     "- If translating, prioritize business intent and readability over word-for-word translation.",
     "- If the draft contains harsh or sensitive wording, soften it while preserving the request.",
+    "- The email body must be a finished business email that can be copied and sent as-is.",
+  ].join("\n");
+}
+
+export function createUserPrompt(
+  input: MailFormInput,
+  options: GenerateEmailOptions = {},
+) {
+  const template = getMailTemplateById(input.mailTemplateId);
+
+  return [
+    buildBusinessMailPrompt(input, template),
+    "",
+    "Refinement controls:",
+    `- Refinement request: ${refinementInstruction(options.action)}`,
+    `- Variant number: ${options.variant ?? 0}`,
   ].join("\n");
 }

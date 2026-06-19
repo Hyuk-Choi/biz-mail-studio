@@ -9,6 +9,7 @@ BizMail Studio는 사용자의 간단한 초안과 상황 정보를 바탕으로
 ## 주요 기능
 
 - 메일 케이스별 본문 구조 자동 구성
+- 비즈니스 메일 폼 선택 및 폼별 작성 가이드 질문 제공
 - 한국어 비즈니스 메일 생성
 - 영어 비즈니스 메일 생성
 - 한국어 초안의 영어 비즈니스 메일 변환
@@ -191,8 +192,10 @@ components/
   Header.tsx                   # 앱 헤더
   MailForm.tsx                 # 입력 폼
   MailResult.tsx               # 결과 출력 영역
+  TemplateSelector.tsx         # 비즈니스 메일 폼 선택 UI
 data/
   mailOptions.ts               # 메일 케이스, 언어, 톤 옵션
+  mailTemplates.ts             # 메일 폼별 구조, 가이드, 예시 데이터
 lib/
   generateEmail.ts             # 개발용 mock 생성기
   mailApiClient.ts             # 클라이언트 API 호출 함수
