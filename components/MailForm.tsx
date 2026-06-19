@@ -19,6 +19,38 @@ interface MailFormProps {
 
 const defaultSelectedTemplateId: MailTemplateId = "work-request";
 
+const draftExamples = [
+  {
+    label: "자료 전달 지연 사과",
+    draft:
+      "거래처에 자료 전달이 늦어서 죄송하다고 하고, 오늘 오후까지 다시 확인해서 보내겠다고 말해줘.",
+  },
+  {
+    label: "미팅 일정 조율",
+    draft:
+      "다음 주 화요일이나 수요일 중에 미팅 가능한지 정중하게 물어보고 싶어.",
+  },
+  {
+    label: "견적서 요청",
+    draft:
+      "거래처에 견적서를 이번 주 안으로 받을 수 있는지 정중하게 물어보고 싶어.",
+  },
+  {
+    label: "회신 리마인드",
+    draft:
+      "지난주에 보낸 제안서에 아직 답이 없어서 정중하게 다시 확인하고 싶어.",
+  },
+  {
+    label: "영어 요청 메일",
+    draft: "Ask the client to send the revised proposal by Friday.",
+  },
+  {
+    label: "협업 제안 메일",
+    draft:
+      "브랜드 담당자에게 신규 캠페인 관련 협업을 제안하고, 관심 있으면 다음 주에 짧게 미팅하고 싶다고 말해줘.",
+  },
+];
+
 export default function MailForm({
   value,
   isGenerating,
@@ -68,6 +100,24 @@ export default function MailForm({
       </div>
 
       <div className="grid gap-5">
+        <div className="grid gap-2">
+          <span className="text-sm font-medium text-slate-700">
+            입력 예시
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {draftExamples.map((example) => (
+              <button
+                key={example.label}
+                type="button"
+                onClick={() => updateField("rawDraft", example.draft)}
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              >
+                {example.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <label className="grid gap-2">
           <span className="text-sm font-medium text-slate-700">
             대충 쓴 메일 내용

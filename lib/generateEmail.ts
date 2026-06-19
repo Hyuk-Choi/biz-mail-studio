@@ -62,8 +62,10 @@ function compactLines(value = "") {
 function cleanInstructionWords(value: string) {
   return value
     .replace(/말해줘|말하고 싶어|하고 싶어|물어보고 싶어|작성해줘|써줘/g, "")
+    .replace(/싶다고\s*\.?/g, "")
     .replace(/^ask the client to\s+/i, "")
     .replace(/^please\s+/i, "")
+    .replace(/\s+\./g, ".")
     .trim();
 }
 
@@ -246,6 +248,14 @@ function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: Out
     return "자료 전달 지연";
   }
 
+  if (analysis.recommendedTemplateId === "collaboration" && /신규\s*캠페인/.test(text)) {
+    return "신규 캠페인 협업";
+  }
+
+  if (analysis.recommendedTemplateId === "collaboration" && /협업/.test(text)) {
+    return "협업 제안";
+  }
+
   if (/(견적서|견적|비용|가격)/.test(text)) {
     return "견적";
   }
@@ -331,7 +341,7 @@ function koreanBody(ctx: GenerationContext) {
     "meeting-request": `${topic}에 대해 논의드리고자 미팅을 요청드립니다.`,
     "meeting-follow-up": `앞서 논의한 ${topic} 관련 내용을 정리하여 공유드립니다.`,
     proposal: `${topic} 관련하여 아래와 같이 제안드립니다.`,
-    collaboration: `${topic} 관련 협업 가능성을 논의드리고자 연락드립니다.`,
+    collaboration: `${topic}${topic.includes("협업") ? " 가능성을" : " 관련 협업 가능성을"} 논의드리고자 연락드립니다.`,
     "quotation-request": `${topic} 관련 견적을 문의드립니다.`,
     "document-request": `${topic} 관련 자료 전달을 요청드립니다.`,
     "reply-reminder": `지난번 전달드린 ${topic} 관련하여 확인차 다시 연락드립니다.`,
@@ -542,7 +552,9 @@ function buildSubjects(ctx: GenerationContext) {
     "meeting-request": [`[미팅 요청] ${koTopic} 관련 논의 요청드립니다`, `${koTopic} 미팅 가능 여부 문의드립니다`, `${koTopic} 관련 미팅 요청드립니다`],
     "meeting-follow-up": [`[팔로업] ${koTopic} 논의 내용 공유드립니다`, `${koTopic} 후속 액션 공유드립니다`, `${koTopic} 미팅 후속 정리드립니다`],
     proposal: [`[제안] ${koTopic} 관련 제안드립니다`, `${koTopic} 제안 검토 부탁드립니다`, `${koTopic} 관련 제안서 공유드립니다`],
-    collaboration: [`[협업 제안] ${koTopic} 협업 제안드립니다`, `${koTopic} 관련 협업 논의 요청드립니다`, `${koTopic} 파트너십 제안드립니다`],
+    collaboration: koTopic.includes("협업")
+      ? [`[협업 제안] ${koTopic} 제안드립니다`, `${koTopic} 논의 요청드립니다`, `${koTopic} 검토 부탁드립니다`]
+      : [`[협업 제안] ${koTopic} 협업 제안드립니다`, `${koTopic} 관련 협업 논의 요청드립니다`, `${koTopic} 파트너십 제안드립니다`],
     "quotation-request": [`[견적 요청] ${koTopic} 견적 문의드립니다`, `${koTopic} 견적 확인 부탁드립니다`, `${koTopic} 비용 문의드립니다`],
     "document-request": [`[자료 요청] ${koTopic} 전달 요청드립니다`, `${koTopic} 자료 공유 부탁드립니다`, `${koTopic} 관련 자료 요청드립니다`],
     "reply-reminder": [`[리마인드] ${koTopic} 관련 회신 요청드립니다`, `${koTopic} 확인차 다시 연락드립니다`, `${koTopic} 회신 확인 부탁드립니다`],

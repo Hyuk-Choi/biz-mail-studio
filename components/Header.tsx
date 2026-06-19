@@ -1,11 +1,18 @@
+import Image from "next/image";
+
 export default function Header() {
   return (
     <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-6 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-700 text-sm font-bold text-white shadow-sm">
-            B
-          </div>
+          <Image
+            src="/bizmail-icon.png"
+            alt="BizMail Studio"
+            width={44}
+            height={44}
+            priority
+            className="h-11 w-11 rounded-xl object-cover shadow-sm ring-1 ring-slate-200"
+          />
           <div>
             <h1 className="text-2xl font-semibold tracking-normal text-slate-950">
               BizMail Studio

@@ -103,8 +103,8 @@ const templateRules: TemplateRule[] = [
     situation: "협업 또는 제휴를 요청하는 상황",
     purpose: "협업 배경과 아이디어를 설명하고 검토를 요청",
     tone: "friendly-professional",
-    keywords: ["협업", "콜라보", "파트너십", "제휴", "브랜드 협업", "같이 진행", "공동 프로젝트", "partnership"],
-    priority: 62,
+    keywords: ["협업", "협업 제안", "협업을 제안", "콜라보", "파트너십", "제휴", "브랜드 협업", "같이 진행", "공동 프로젝트", "partnership"],
+    priority: 78,
   },
   {
     id: "thanks",
