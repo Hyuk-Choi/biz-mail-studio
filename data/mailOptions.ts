@@ -1,4 +1,10 @@
-import type { MailCase, MailLanguage, MailOption, MailTone } from "@/types/mail";
+import type {
+  LanguageMode,
+  MailCase,
+  MailOption,
+  MailTone,
+  TemplateMode,
+} from "@/types/mail";
 
 export const mailCases: MailOption<MailCase>[] = [
   { id: "work_request", label: "업무 요청 메일", description: "명확한 요청과 기한을 전달합니다." },
@@ -20,22 +26,37 @@ export const mailCases: MailOption<MailCase>[] = [
   { id: "other", label: "기타", description: "특수한 상황의 메일을 작성합니다." },
 ];
 
-export const languageOptions: MailOption<MailLanguage>[] = [
-  { id: "ko_business", label: "한국어 비즈니스 메일" },
-  { id: "en_business", label: "영어 비즈니스 메일" },
-  { id: "ko_to_en", label: "한국어 초안을 영어 비즈니스 메일로 변환" },
-  { id: "en_to_ko", label: "영어 초안을 한국어 비즈니스 메일로 변환" },
+export const templateModeOptions: MailOption<TemplateMode>[] = [
+  {
+    id: "auto",
+    label: "자동 추천",
+    description: "입력 내용을 분석해 가장 적절한 메일 폼을 추천합니다.",
+  },
+  {
+    id: "manual",
+    label: "직접 선택",
+    description: "사용자가 고른 메일 폼을 우선 적용합니다.",
+  },
+];
+
+export const languageOptions: MailOption<LanguageMode>[] = [
+  { id: "auto", label: "자동 감지" },
+  { id: "ko", label: "한국어 비즈니스 메일" },
+  { id: "en", label: "영어 비즈니스 메일" },
+  { id: "ko-to-en", label: "한국어 초안을 영어 메일로" },
+  { id: "en-to-ko", label: "영어 초안을 한국어 메일로" },
 ];
 
 export const toneOptions: MailOption<MailTone>[] = [
+  { id: "auto", label: "자동 추천" },
   { id: "polite", label: "정중한" },
   { id: "concise", label: "간결한" },
-  { id: "warm", label: "부드러운" },
+  { id: "soft", label: "부드러운" },
   { id: "firm", label: "단호한" },
   { id: "persuasive", label: "설득력 있는" },
-  { id: "friendly_professional", label: "친근하지만 전문적인" },
+  { id: "friendly-professional", label: "친근하지만 전문적인" },
   { id: "formal", label: "격식 있는" },
-  { id: "global_business", label: "글로벌 비즈니스 스타일" },
+  { id: "global-business", label: "글로벌 비즈니스 스타일" },
 ];
 
 export const featuredCaseCards = [

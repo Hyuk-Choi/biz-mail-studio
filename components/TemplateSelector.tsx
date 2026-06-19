@@ -6,12 +6,14 @@ interface TemplateSelectorProps {
   templates: MailTemplate[];
   selectedId: MailTemplateId;
   onSelect: (templateId: MailTemplateId) => void;
+  showQuickCards?: boolean;
 }
 
 export default function TemplateSelector({
   templates,
   selectedId,
   onSelect,
+  showQuickCards = false,
 }: TemplateSelectorProps) {
   const selectedTemplate =
     templates.find((template) => template.id === selectedId) ?? templates[0];
@@ -33,33 +35,37 @@ export default function TemplateSelector({
         </select>
       </label>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        {templates.slice(0, 8).map((template) => {
-          const isSelected = template.id === selectedId;
+      {showQuickCards ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {templates.slice(0, 8).map((template) => {
+            const isSelected = template.id === selectedId;
 
-          return (
-            <button
-              key={template.id}
-              type="button"
-              onClick={() => onSelect(template.id)}
-              className={`rounded-md border px-3 py-3 text-left transition ${
-                isSelected
-                  ? "border-blue-500 bg-blue-50 text-blue-950 shadow-sm"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-slate-50"
-              }`}
-            >
-              <span className="block text-sm font-semibold">{template.label}</span>
-              <span
-                className={`mt-1 line-clamp-2 block text-xs leading-5 ${
-                  isSelected ? "text-blue-800" : "text-slate-500"
+            return (
+              <button
+                key={template.id}
+                type="button"
+                onClick={() => onSelect(template.id)}
+                className={`rounded-md border px-3 py-3 text-left transition ${
+                  isSelected
+                    ? "border-blue-500 bg-blue-50 text-blue-950 shadow-sm"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-slate-50"
                 }`}
               >
-                {template.description}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                <span className="block text-sm font-semibold">
+                  {template.label}
+                </span>
+                <span
+                  className={`mt-1 line-clamp-2 block text-xs leading-5 ${
+                    isSelected ? "text-blue-800" : "text-slate-500"
+                  }`}
+                >
+                  {template.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       <div className="rounded-md border border-blue-100 bg-blue-50 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">

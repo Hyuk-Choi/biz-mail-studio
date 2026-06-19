@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { generateMockEmail } from "@/lib/generateEmail";
+import { generateBusinessMail } from "@/lib/generateEmail";
 import { generateOpenAIEmail } from "@/lib/openaiEmail";
 import type {
   GenerateEmailOptions,
@@ -14,7 +14,9 @@ export const runtime = "nodejs";
 const refinementActions = new Set<MailRefinementAction>([
   "more_polite",
   "shorter",
-  "more_persuasive",
+  "clearer",
+  "softer",
+  "firmer",
   "translate_to_english",
   "translate_to_korean",
   "regenerate",
@@ -22,6 +24,10 @@ const refinementActions = new Set<MailRefinementAction>([
 
 function isString(value: unknown): value is string {
   return typeof value === "string";
+}
+
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === "string";
 }
 
 function isMailFormInput(value: unknown): value is MailFormInput {
@@ -32,21 +38,25 @@ function isMailFormInput(value: unknown): value is MailFormInput {
   const input = value as Record<keyof MailFormInput, unknown>;
 
   return (
-    isString(input.mailCase) &&
-    isString(input.mailTemplateId) &&
-    isString(input.language) &&
+    isString(input.rawDraft) &&
+    isString(input.templateMode) &&
+    isOptionalString(input.selectedTemplateId) &&
+    isString(input.languageMode) &&
     isString(input.tone) &&
-    isString(input.recipient) &&
-    isString(input.purpose) &&
-    isString(input.keyPoints) &&
-    isString(input.draft) &&
-    isString(input.additionalRequests)
+    isOptionalString(input.recipient) &&
+    isOptionalString(input.sender) &&
+    isOptionalString(input.purpose) &&
+    isOptionalString(input.mustInclude) &&
+    isOptionalString(input.extraInstruction)
   );
 }
 
 function hasMinimumContent(input: MailFormInput) {
   return Boolean(
-    input.purpose.trim() || input.keyPoints.trim() || input.draft.trim(),
+    input.rawDraft.trim() ||
+      input.purpose?.trim() ||
+      input.mustInclude?.trim() ||
+      input.extraInstruction?.trim(),
   );
 }
 
@@ -87,7 +97,7 @@ export async function POST(request: Request) {
     return NextResponse.json<MailGenerationResponse>(
       {
         success: false,
-        error: "메일 목적, 반드시 포함할 내용, 초안 중 하나 이상 입력해주세요.",
+        error: "대충 쓴 메일 내용이나 반드시 포함할 내용을 입력해주세요.",
       },
       { status: 400 },
     );
@@ -99,7 +109,7 @@ export async function POST(request: Request) {
 
   try {
     if (forceMock || !hasApiKey) {
-      const data = await generateMockEmail(payload.input, options);
+      const data = await generateBusinessMail(payload.input, options);
 
       return NextResponse.json<MailGenerationResponse>({
         success: true,

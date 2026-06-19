@@ -162,6 +162,17 @@ export const mailTemplates: MailTemplate[] = [
     koreanExample: `안녕하세요, {받는 사람}님.\n\n{주제}와 관련하여 해외 파트너에게 전달할 영어 비즈니스 메일을 작성합니다.\n\n메일에는 아래 내용이 포함되어야 합니다.\n\n1. 연락 목적: {목적}\n2. 주요 내용: {핵심 내용}\n3. 요청 사항: {요청}\n4. 희망 일정: {일정}`,
     englishExample: `Dear {Recipient},\n\nI hope this message finds you well.\n\nI am reaching out regarding {topic}.\n\nWe would like to share the following details with you:\n\n1. Background: {context}\n2. Key points: {key points}\n3. Request: {specific request}\n\nPlease let us know if you have any questions or if further information is needed.\n\nWe would appreciate your feedback by {deadline}.\n\nBest regards,\n{Sender}`,
   },
+  {
+    id: "general-business",
+    label: "일반 비즈니스 메일",
+    description: "특정 폼으로 분류하기 어려운 내용을 정중한 비즈니스 메일로 정리할 때 사용합니다.",
+    recommendedTone: "정중하고 명확한 톤",
+    subjectPattern: "[문의] {건명} 관련하여 메일드립니다",
+    structure: ["인사", "연락 목적", "핵심 내용", "요청 또는 확인 사항", "마무리"],
+    guideQuestions: ["메일의 핵심 목적은 무엇인가요?", "상대방이 확인해야 할 내용은 무엇인가요?", "어떤 답변이나 액션을 기대하나요?"],
+    koreanExample: `안녕하세요, {받는 사람}님.\n\n{건명} 관련하여 메일드립니다.\n\n핵심 내용은 아래와 같습니다.\n\n1. {핵심 내용 1}\n2. {핵심 내용 2}\n\n확인 후 의견이나 필요한 조치 사항을 알려주시면 감사하겠습니다.\n\n감사합니다.\n{보내는 사람}`,
+    englishExample: `Hi {Recipient},\n\nI hope you are doing well.\n\nI am reaching out regarding {topic}.\n\nPlease see the key details below:\n\n- {Key point 1}\n- {Key point 2}\n\nPlease let me know if you have any questions or if further information is needed.\n\nBest regards,\n{Sender}`,
+  },
 ];
 
 export const templateToMailCaseMap: Record<MailTemplateId, MailCase> = {
@@ -181,8 +192,9 @@ export const templateToMailCaseMap: Record<MailTemplateId, MailCase> = {
   report: "report",
   "self-introduction": "self_introduction",
   "global-business": "overseas_partner",
+  "general-business": "other",
 };
 
-export function getMailTemplateById(id: MailTemplateId) {
+export function getMailTemplateById(id?: MailTemplateId) {
   return mailTemplates.find((template) => template.id === id) ?? mailTemplates[0];
 }

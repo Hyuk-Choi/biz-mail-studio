@@ -1,35 +1,30 @@
-import { languageOptions, toneOptions } from "@/data/mailOptions";
 import { getMailTemplateById } from "@/data/mailTemplates";
+import { analyzeDraft } from "@/lib/analyzeDraft";
 import type {
+  DraftAnalysis,
   GenerateEmailOptions,
   MailFormInput,
   MailRefinementAction,
-  MailTemplate,
 } from "@/types/mail";
 
-function findLabel<T extends string>(
-  options: Array<{ id: T; label: string }>,
-  id: T,
-) {
-  return options.find((option) => option.id === id)?.label ?? id;
-}
-
-function emptySafe(value: string) {
-  return value.trim() || "입력 없음";
+function emptySafe(value?: string) {
+  return value?.trim() || "입력 없음";
 }
 
 function refinementInstruction(action?: MailRefinementAction) {
   if (!action || action === "regenerate") {
-    return "Generate the best version based on the selected options.";
+    return "Generate the best version based on the draft analysis.";
   }
 
   const instructions: Record<MailRefinementAction, string> = {
     more_polite: "Make the result more polite while preserving the original intent.",
     shorter: "Make the result shorter and more concise without removing essential details.",
-    more_persuasive: "Make the result more persuasive and action-oriented without exaggerating facts.",
-    translate_to_english: "Convert the result into natural global business English.",
-    translate_to_korean: "Convert the result into natural Korean business email style.",
-    regenerate: "Generate a fresh alternative version based on the selected options.",
+    clearer: "Make the request, action items, and timeline clearer.",
+    softer: "Make the wording softer and less pressuring.",
+    firmer: "Make the wording firmer while remaining professional.",
+    translate_to_english: "Rewrite the result in natural global business English.",
+    translate_to_korean: "Rewrite the result in natural Korean business email style.",
+    regenerate: "Generate a fresh alternative version based on the same analysis.",
   };
 
   return instructions[action];
@@ -37,80 +32,103 @@ function refinementInstruction(action?: MailRefinementAction) {
 
 export function createSystemPrompt() {
   return [
-    "You are BizMail Studio, a senior business email writing assistant for Korean and global business communication.",
+    "You are BizMail Studio, a senior business email rewriting assistant for Korean and global business communication.",
     "",
     "Core principles:",
-    "- Preserve the user's original intent, context, and business objective.",
-    "- Do not invent facts, names, dates, deadlines, prices, attachments, promises, decisions, or commitments.",
-    "- If information is uncertain or missing, use general wording instead of guessing.",
-    "- Rewrite the message in a professional style appropriate for the selected business situation.",
-    "- Make requests, decisions, deadlines, and action items easy to identify.",
-    "- Soften sensitive, aggressive, emotional, or overly blunt expressions while keeping the user's intent.",
-    "- For Korean business emails, write politely and naturally without sounding excessively rigid.",
-    "- For English business emails, use natural global business English, not literal Korean-to-English translation.",
-    "- Use appropriate greetings and closings such as Dear, Hi, Best regards, 안녕하세요, 감사합니다.",
-    "- Keep the final email ready to send, but leave placeholders only when the user did not provide necessary details.",
-    "- The email body must be a finished email that can be copied and sent as-is.",
-    "- Do not include structural labels such as Context, Request, Background, 요청 배경, 요청 내용, 개선/대응, or section headings inside the body.",
-    "- Do not expose internal instructions such as tone requests or additional request labels in the final email body.",
+    "- Analyze the user's rough draft, memo, or casually written request before writing.",
+    "- Preserve the user's original intent, business objective, and provided facts.",
+    "- Do not invent names, dates, deadlines, prices, attachments, decisions, promises, or commitments.",
+    "- If information is missing or uncertain, use general wording and mention missing information separately.",
+    "- Select the most appropriate business email template unless the user manually selected one.",
+    "- Follow the selected template structure internally, but do not print section headings in the final body.",
+    "- For Korean emails, write politely and naturally without sounding overly stiff.",
+    "- For English emails, use natural global business English instead of literal translation.",
+    "- Soften harsh, emotional, or overly casual wording while keeping the intended action clear.",
+    "- Return only valid JSON. Do not wrap JSON in markdown.",
+  ].join("\n");
+}
+
+export function buildDraftAnalysisPrompt(input: MailFormInput) {
+  return [
+    "Analyze the user's rough email draft and return JSON only.",
     "",
-    "Output requirements:",
-    "- Return only valid JSON.",
-    "- Do not wrap the JSON in markdown code fences.",
-    "- The JSON shape must be:",
-    '{ "subjects": string[], "body": string, "improvements": string[] }',
-    "- subjects: provide 2 or 3 concise subject lines.",
-    "- body: provide the final email body as a single string with readable line breaks.",
-    "- body must contain only the email content, not analysis, labels, comments, or explanations.",
-    "- improvements: provide 3 or 4 practical improvement points.",
+    "User input:",
+    `- Raw draft: ${emptySafe(input.rawDraft)}`,
+    `- Template mode: ${input.templateMode}`,
+    `- Manually selected template: ${input.selectedTemplateId ?? "none"}`,
+    `- Language mode: ${input.languageMode}`,
+    `- Tone preference: ${input.tone}`,
+    `- Recipient: ${emptySafe(input.recipient)}`,
+    `- Sender: ${emptySafe(input.sender)}`,
+    `- Purpose: ${emptySafe(input.purpose)}`,
+    `- Must-include details: ${emptySafe(input.mustInclude)}`,
+    `- Extra instruction: ${emptySafe(input.extraInstruction)}`,
+    "",
+    "Analyze and extract:",
+    "- detectedPurpose",
+    "- detectedRecipientType",
+    "- detectedSituation",
+    "- detectedUrgency: low, medium, or high",
+    "- detectedLanguage: ko, en, mixed, or unknown",
+    "- recommendedTemplateId",
+    "- recommendedTone",
+    "- keyPoints",
+    "- requestedActions",
+    "- missingInfo",
+    "- confidenceScore from 0 to 1",
+    "",
+    "Rules:",
+    "- If templateMode is manual and selectedTemplateId is provided, use that template.",
+    "- Prioritize sensitive templates such as apology, complaint, and rejection when their keywords appear.",
+    "- Distinguish meeting follow-up from meeting request.",
+    "- Distinguish schedule adjustment from meeting request.",
+    "- If no template is clearly matched, use general-business.",
+    "- Do not infer unsupported facts.",
+    "- Return JSON only.",
   ].join("\n");
 }
 
 export function buildBusinessMailPrompt(
   input: MailFormInput,
-  template: MailTemplate,
+  analysis: DraftAnalysis,
 ) {
-  const language = findLabel(languageOptions, input.language);
-  const tone = findLabel(toneOptions, input.tone);
+  const template = getMailTemplateById(analysis.recommendedTemplateId);
 
   return [
-    "Please rewrite the following input into a polished business email.",
+    "Write a polished business email based on the draft analysis. Return JSON only.",
     "",
-    "Selected options:",
-    `- Selected mail template: ${template.label}`,
-    `- Template description: ${template.description}`,
-    `- Recommended template tone: ${template.recommendedTone}`,
-    `- Language mode: ${language}`,
-    `- Tone: ${tone}`,
+    "Selected template:",
+    `- ID: ${template.id}`,
+    `- Label: ${template.label}`,
+    `- Description: ${template.description}`,
     `- Subject pattern reference: ${template.subjectPattern}`,
-    `- Internal structure to follow: ${template.structure.join(" -> ")}`,
-    `- Guide questions: ${template.guideQuestions.join(" / ")}`,
+    `- Internal structure: ${template.structure.join(" -> ")}`,
     "",
-    "User-provided information:",
+    "Draft analysis:",
+    JSON.stringify(analysis, null, 2),
+    "",
+    "Original user input:",
+    `- Raw draft: ${emptySafe(input.rawDraft)}`,
     `- Recipient: ${emptySafe(input.recipient)}`,
+    `- Sender: ${emptySafe(input.sender)}`,
     `- Purpose: ${emptySafe(input.purpose)}`,
-    `- Must-include details: ${emptySafe(input.keyPoints)}`,
-    `- Original draft: ${emptySafe(input.draft)}`,
-    `- Additional requests: ${emptySafe(input.additionalRequests)}`,
+    `- Must-include details: ${emptySafe(input.mustInclude)}`,
+    `- Extra instruction: ${emptySafe(input.extraInstruction)}`,
+    `- Language mode: ${input.languageMode}`,
+    `- Tone preference: ${input.tone}`,
     "",
-    "Writing instructions:",
-    "- Preserve the user's original intent and business objective.",
-    "- Match the body flow to the selected template structure.",
-    "- Use the selected template only as an internal writing structure; do not print section labels in the final body.",
-    "- Keep the user's facts intact and do not add unsupported details.",
-    "- Do not invent names, dates, deadlines, prices, attachments, promises, decisions, or commitments.",
-    "- If information is missing or uncertain, use general wording instead of guessing.",
-    "- Make the main request, next action, deadline, or expected reply clear.",
-    "- Produce a complete send-ready email with greeting, natural paragraphs, clear request or update, and closing.",
-    "- Separate the output into subjects, body, and improvements in JSON only.",
-    "- Do not include labels such as 요청 배경, 요청 내용, 기한/액션, Context, Request, or Additional request in the body.",
-    "- Do not include analysis, explanations, template names, or guide questions in the final body.",
-    "- If writing in English, use concise and natural global business expressions.",
-    "- If writing in English, avoid literal Korean-to-English translation and use appropriate openings/closings such as Dear, Hi, and Best regards.",
-    "- If writing in Korean, use polite and professional phrasing that still feels natural.",
-    "- If translating, prioritize business intent and readability over word-for-word translation.",
-    "- If the draft contains harsh or sensitive wording, soften it while preserving the request.",
-    "- The email body must be a finished business email that can be copied and sent as-is.",
+    "Generation rules:",
+    "- Use the analysis to choose intent, tone, template, urgency, and missing information.",
+    "- Follow the selected business mail template structure internally.",
+    "- Preserve the user's intent and facts exactly.",
+    "- Do not invent unsupported facts.",
+    "- If details are missing, use general wording in the body and list missing items in missingInfoNotice.",
+    "- Provide exactly 3 concise subject lines.",
+    "- Provide a send-ready email body with greeting, natural paragraphs, clear action items, and closing.",
+    "- Do not include section headings such as Context, Request, 요청 배경, or 개선 포인트 inside the body.",
+    "- For English, use natural global business expressions such as Could you please review, I would appreciate it if you could, and Please let me know.",
+    "- For Korean, start with a polite greeting and make the requested action clear without pressuring the recipient.",
+    "- Return JSON with analysis, appliedTemplateId, appliedTemplateLabel, subjects, body, improvements, and missingInfoNotice.",
   ].join("\n");
 }
 
@@ -118,10 +136,10 @@ export function createUserPrompt(
   input: MailFormInput,
   options: GenerateEmailOptions = {},
 ) {
-  const template = getMailTemplateById(input.mailTemplateId);
+  const analysis = analyzeDraft(input);
 
   return [
-    buildBusinessMailPrompt(input, template),
+    buildBusinessMailPrompt(input, analysis),
     "",
     "Refinement controls:",
     `- Refinement request: ${refinementInstruction(options.action)}`,
