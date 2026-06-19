@@ -1,5 +1,13 @@
 {
   "installCommand": "pnpm install",
   "buildCommand": "pnpm build",
-  "devCommand": "pnpm dev"
+  "devCommand": "pnpm dev",
+  "experimentalServices": {
+    "bizmail-studio": {
+      "type": "web",
+      "routePrefix": "/",
+      "framework": "nextjs",
+      "buildCommand": "corepack enable && pnpm install --frozen-lockfile && pnpm build"
+    }
+  }
 }
