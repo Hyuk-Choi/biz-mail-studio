@@ -54,18 +54,18 @@ const draftExamples = [
 const inputFrameworkItems = [
   {
     symbol: "必",
-    label: "반드시 넣을 정보",
-    description: "상대에게 꼭 전달되어야 하는 사실, 기한, 요청사항",
+    label: "필수 조건",
+    description: "검수, 승인, 기한처럼 반드시 반영해야 하는 내용",
   },
   {
     symbol: "有",
-    label: "있으면 좋은 맥락",
-    description: "받는 사람, 목적, 배경처럼 메일을 더 자연스럽게 만드는 정보",
+    label: "있음/가능성",
+    description: "변동 가능성, 리스크, 참고 사항처럼 존재를 알려야 하는 내용",
   },
   {
     symbol: "多",
-    label: "다듬기 방향",
-    description: "더 정중하게, 짧게, 설득력 있게 등 원하는 표현 방식",
+    label: "많음/여러 건",
+    description: "수정 사항, 문의, 옵션처럼 여러 건이 있음을 알려야 하는 내용",
   },
 ];
 
@@ -125,8 +125,11 @@ export default function MailForm({
                 BizMail Form
               </p>
               <h3 className="mt-1 text-sm font-semibold text-slate-950">
-                必 · 有 · 多 입력 프레임워크
+                업무 메모 표기 자동 해석
               </h3>
+              <p className="mt-1 text-xs leading-5 text-blue-800">
+                예: 인플루언서 5인 차주 진행 (사전 검수 必), 변동 가능성 有
+              </p>
             </div>
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -171,12 +174,12 @@ export default function MailForm({
 
         <label className="grid gap-2">
           <span className="text-sm font-medium text-slate-700">
-            必 대충 쓴 메일 내용
+            대충 쓴 메일 내용
           </span>
           <textarea
             value={value.rawDraft}
             onChange={(event) => updateField("rawDraft", event.target.value)}
-            placeholder="보내고 싶은 내용을 편하게 적어주세요. 예: 거래처에 자료가 늦어서 죄송하다고 하고, 오늘 오후까지 다시 보내겠다고 말하고 싶어."
+            placeholder="보내고 싶은 내용을 편하게 적어주세요. 예: 인플루언서 5인 차주 진행 (사전 검수 必), 변동 가능성 有, 수정 요청 多"
             rows={8}
             className="resize-y rounded-md border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
           />
@@ -291,7 +294,7 @@ export default function MailForm({
 
         <label className="grid gap-2">
           <span className="text-sm font-medium text-slate-700">
-            必 반드시 포함할 내용
+            반드시 포함할 내용
             <span className="ml-1 font-normal text-slate-400">선택</span>
           </span>
           <textarea
@@ -306,7 +309,7 @@ export default function MailForm({
         <div className="grid gap-5 md:grid-cols-2">
           <label className="grid gap-2">
             <span className="text-sm font-medium text-slate-700">
-              有 메일 목적
+              메일 목적
               <span className="ml-1 font-normal text-slate-400">선택</span>
             </span>
             <input
@@ -319,7 +322,7 @@ export default function MailForm({
 
           <label className="grid gap-2">
             <span className="text-sm font-medium text-slate-700">
-              多 추가 요청사항
+              추가 요청사항
               <span className="ml-1 font-normal text-slate-400">선택</span>
             </span>
             <input

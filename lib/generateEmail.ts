@@ -1,5 +1,10 @@
 import { getMailTemplateById } from "@/data/mailTemplates";
 import { analyzeDraft } from "@/lib/analyzeDraft";
+import {
+  extractBizMailMarkerInsightsFromInput,
+  formatBizMailMarkerInsight,
+  normalizeBizMailMarkerSyntax,
+} from "@/lib/bizMailMarkers";
 import type {
   DraftAnalysis,
   GenerateEmailOptions,
@@ -67,6 +72,25 @@ function cleanInstructionWords(value: string) {
     .replace(/^please\s+/i, "")
     .replace(/\s+\./g, ".")
     .trim();
+}
+
+function cleanKeyPoint(value: string, language: OutputLanguage) {
+  return cleanInstructionWords(normalizeBizMailMarkerSyntax(value, language));
+}
+
+function uniqueLines(lines: string[]) {
+  const seen = new Set<string>();
+
+  return lines.filter((line) => {
+    const normalized = line.trim();
+
+    if (!normalized || seen.has(normalized)) {
+      return false;
+    }
+
+    seen.add(normalized);
+    return true;
+  });
 }
 
 function titleCase(value: string) {
@@ -275,14 +299,31 @@ function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: Out
   return explicit || "관련 건";
 }
 
-function getKeyPoints(input: MailFormInput, analysis: DraftAnalysis) {
-  const explicit = compactLines(input.mustInclude);
+function getKeyPoints(
+  input: MailFormInput,
+  analysis: DraftAnalysis,
+  language: OutputLanguage,
+) {
+  const markerPoints = extractBizMailMarkerInsightsFromInput(input).map((insight) =>
+    formatBizMailMarkerInsight(insight, language),
+  );
+  const explicit = compactLines(input.mustInclude).map((line) =>
+    normalizeBizMailMarkerSyntax(line, language),
+  );
 
   if (explicit.length) {
-    return explicit;
+    return uniqueLines([...explicit, ...markerPoints]);
   }
 
-  return analysis.keyPoints.length ? analysis.keyPoints : [cleanInstructionWords(input.rawDraft)];
+  const analyzedPoints = analysis.keyPoints.map((point) =>
+    normalizeBizMailMarkerSyntax(point, language),
+  );
+
+  return uniqueLines(
+    analyzedPoints.length
+      ? [...analyzedPoints, ...markerPoints]
+      : [cleanKeyPoint(input.rawDraft, language), ...markerPoints],
+  );
 }
 
 function greeting(input: MailFormInput, language: OutputLanguage, tone: MailTone) {
@@ -319,7 +360,9 @@ function closing(input: MailFormInput, language: OutputLanguage, tone: MailTone)
 }
 
 function bulletList(items: string[], language: OutputLanguage) {
-  const cleaned = items.map(cleanInstructionWords).filter(Boolean);
+  const cleaned = uniqueLines(
+    items.map((item) => cleanKeyPoint(item, language)).filter(Boolean),
+  );
 
   if (!cleaned.length) {
     return language === "en"
@@ -581,11 +624,14 @@ function buildSubjects(ctx: GenerationContext) {
 
 function buildImprovements(ctx: GenerationContext) {
   const template = getMailTemplateById(ctx.templateId);
+  const hasMarkerInsights = extractBizMailMarkerInsightsFromInput(ctx.input).length > 0;
 
   if (ctx.language === "en") {
     return [
       `Analyzed the rough input and matched it to the ${template.label} structure.`,
-      "Applied the BizMail framework: required facts, useful context, and rewriting direction.",
+      hasMarkerInsights
+        ? "Interpreted the 必/有/多 memo markers as required, existing/possible, and multiple-item notes."
+        : "Applied the BizMail framework to separate facts, context, and requested actions.",
       "Converted the message into natural global business English rather than a literal translation.",
       `Adjusted the tone to ${toneLabels[ctx.tone]}.`,
       "Kept the content limited to the facts and intent provided by the user.",
@@ -594,7 +640,9 @@ function buildImprovements(ctx: GenerationContext) {
 
   return [
     `입력 내용을 분석해 ${template.label} 구조로 재작성했습니다.`,
-    "必/有/多 입력 프레임워크에 따라 필수 정보, 맥락, 다듬기 방향을 구분했습니다.",
+    hasMarkerInsights
+      ? "초안의 必/有/多 표기를 필수 조건, 있음/가능성, 다수 항목으로 해석했습니다."
+      : "입력 내용을 필수 정보, 맥락, 요청 액션으로 구분했습니다.",
     "말하듯 입력된 표현을 정중한 비즈니스 문장으로 완화했습니다.",
     `${toneLabels[ctx.tone]} 톤에 맞춰 요청사항과 액션을 명확하게 정리했습니다.`,
     "사용자가 제공하지 않은 사실은 임의로 추가하지 않았습니다.",
@@ -613,7 +661,7 @@ function buildContext(
   const text = sourceText(input);
   const deadline = extractDeadline(text, language);
   const topic = inferTopic(input, analysis, language);
-  const keyPoints = getKeyPoints(input, analysis);
+  const keyPoints = getKeyPoints(input, analysis, language);
 
   return {
     input,

@@ -4,6 +4,12 @@ import type {
   MailTemplateId,
   MailTone,
 } from "@/types/mail";
+import {
+  extractBizMailMarkerInsightsFromInput,
+  formatBizMailMarkerInsight,
+  normalizeBizMailMarkerSyntax,
+  stripBizMailMarkerSegments,
+} from "@/lib/bizMailMarkers";
 
 type DetectedLanguage = DraftAnalysis["detectedLanguage"];
 type DetectedUrgency = DraftAnalysis["detectedUrgency"];
@@ -278,24 +284,52 @@ function compactLines(value = "") {
     .filter((line) => line.length > 1);
 }
 
+function uniqueLines(lines: string[]) {
+  const seen = new Set<string>();
+
+  return lines.filter((line) => {
+    const normalized = line.trim();
+
+    if (!normalized || seen.has(normalized)) {
+      return false;
+    }
+
+    seen.add(normalized);
+    return true;
+  });
+}
+
 function extractKeyPoints(input: MailFormInput, templateId: MailTemplateId) {
-  const explicit = compactLines(input.mustInclude);
+  const markerPoints = extractBizMailMarkerInsightsFromInput(input).map((insight) =>
+    formatBizMailMarkerInsight(insight, "ko"),
+  );
+  const explicit = compactLines(input.mustInclude).map((line) =>
+    normalizeBizMailMarkerSyntax(line, "ko"),
+  );
 
   if (explicit.length) {
-    return explicit.slice(0, 5);
+    return uniqueLines([...explicit, ...markerPoints]).slice(0, 6);
   }
 
-  const draft = normalize(input.rawDraft);
+  const draft = normalize(stripBizMailMarkerSegments(input.rawDraft));
 
   if (!draft) {
-    return ["입력된 초안의 핵심 내용을 비즈니스 문장으로 정리"];
+    return markerPoints.length
+      ? markerPoints.slice(0, 6)
+      : ["입력된 초안의 핵심 내용을 비즈니스 문장으로 정리"];
   }
 
   if (templateId === "apology" && /(오늘 오후|오늘 중|내일|금요일|이번 주)/.test(draft)) {
-    return [draft.replace(/말해줘|말하고 싶어|하고 싶어/g, "").trim()];
+    return uniqueLines([
+      draft.replace(/말해줘|말하고 싶어|하고 싶어/g, "").trim(),
+      ...markerPoints,
+    ]).slice(0, 6);
   }
 
-  return [draft.replace(/말해줘|말하고 싶어|하고 싶어|물어보고 싶어/g, "").trim()].filter(Boolean);
+  return uniqueLines([
+    draft.replace(/말해줘|말하고 싶어|하고 싶어|물어보고 싶어/g, "").trim(),
+    ...markerPoints,
+  ]).slice(0, 6);
 }
 
 function requestedActions(templateId: MailTemplateId) {
@@ -382,7 +416,9 @@ export function analyzeDraft(input: MailFormInput): DraftAnalysis {
   const keyPoints = extractKeyPoints(input, picked.id);
 
   return {
-    detectedPurpose: normalize(input.purpose) || rule.purpose,
+    detectedPurpose:
+      normalizeBizMailMarkerSyntax(normalize(input.purpose), "ko") ||
+      rule.purpose,
     detectedRecipientType: detectRecipientType(input, rawText),
     detectedSituation: rule.situation,
     detectedUrgency: detectUrgency(rawText),

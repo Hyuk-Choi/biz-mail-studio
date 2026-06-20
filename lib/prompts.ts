@@ -36,7 +36,7 @@ export function createSystemPrompt() {
     "",
     "Core principles:",
     "- Analyze the user's rough draft, memo, or casually written request before writing.",
-    "- Apply the BizMail input framework: 必 means required facts, 有 means useful context, and 多 means rewriting direction.",
+    "- Interpret memo markers when they appear in the draft: 必 means mandatory/required, 有 means exists/possible/present, and 多 means many/multiple items.",
     "- Preserve the user's original intent, business objective, and provided facts.",
     "- Do not invent names, dates, deadlines, prices, attachments, decisions, promises, or commitments.",
     "- If information is missing or uncertain, use general wording and mention missing information separately.",
@@ -45,6 +45,7 @@ export function createSystemPrompt() {
     "- For Korean emails, write politely and naturally without sounding overly stiff.",
     "- For English emails, use natural global business English instead of literal translation.",
     "- Soften harsh, emotional, or overly casual wording while keeping the intended action clear.",
+    "- Do not print raw memo markers such as 必, 有, or 多 in the final body. Convert them into natural business wording.",
     "- Return only valid JSON. Do not wrap JSON in markdown.",
   ].join("\n");
 }
@@ -85,7 +86,7 @@ export function buildDraftAnalysisPrompt(input: MailFormInput) {
     "- Distinguish schedule adjustment from meeting request.",
     "- If no template is clearly matched, use general-business.",
     "- Do not infer unsupported facts.",
-    "- Treat 必 fields as mandatory content, 有 fields as contextual support, and 多 fields as style/refinement instructions.",
+    "- Treat inline markers as business memo shorthand. Example: '사전 검수 必' means pre-review is mandatory, '변동 가능성 有' means there may be changes, and '수정 사항 多' means there are many revision items.",
     "- Return JSON only.",
   ].join("\n");
 }
@@ -122,7 +123,8 @@ export function buildBusinessMailPrompt(
     "Generation rules:",
     "- Use the analysis to choose intent, tone, template, urgency, and missing information.",
     "- Follow the selected business mail template structure internally.",
-    "- Apply the BizMail input framework: include 必 facts, use 有 context to make the email natural, and follow 多 instructions for tone, length, or emphasis.",
+    "- Interpret inline memo markers: 必 as required/mandatory, 有 as exists/possible/present, and 多 as many/multiple items.",
+    "- Convert marker notation into natural wording. For example, '(사전 검수 必)' should become '사전 검수는 필수로 진행되어야 합니다' or similar, and '변동 가능성 有' should become '세부 내용은 변동될 수 있습니다' or similar.",
     "- Preserve the user's intent and facts exactly.",
     "- Do not invent unsupported facts.",
     "- If details are missing, use general wording in the body and list missing items in missingInfoNotice.",
