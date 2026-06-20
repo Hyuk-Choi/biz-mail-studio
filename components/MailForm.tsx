@@ -51,6 +51,24 @@ const draftExamples = [
   },
 ];
 
+const inputFrameworkItems = [
+  {
+    symbol: "必",
+    label: "반드시 넣을 정보",
+    description: "상대에게 꼭 전달되어야 하는 사실, 기한, 요청사항",
+  },
+  {
+    symbol: "有",
+    label: "있으면 좋은 맥락",
+    description: "받는 사람, 목적, 배경처럼 메일을 더 자연스럽게 만드는 정보",
+  },
+  {
+    symbol: "多",
+    label: "다듬기 방향",
+    description: "더 정중하게, 짧게, 설득력 있게 등 원하는 표현 방식",
+  },
+];
+
 export default function MailForm({
   value,
   isGenerating,
@@ -100,6 +118,39 @@ export default function MailForm({
       </div>
 
       <div className="grid gap-5">
+        <section className="rounded-md border border-blue-100 bg-blue-50/70 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                BizMail Form
+              </p>
+              <h3 className="mt-1 text-sm font-semibold text-slate-950">
+                必 · 有 · 多 입력 프레임워크
+              </h3>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {inputFrameworkItems.map((item) => (
+              <div
+                key={item.symbol}
+                className="rounded-md border border-blue-100 bg-white px-3 py-3"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="flex size-7 items-center justify-center rounded bg-blue-700 text-sm font-bold text-white">
+                    {item.symbol}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {item.label}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-600">
+                  {item.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <div className="grid gap-2">
           <span className="text-sm font-medium text-slate-700">
             입력 예시
@@ -120,7 +171,7 @@ export default function MailForm({
 
         <label className="grid gap-2">
           <span className="text-sm font-medium text-slate-700">
-            대충 쓴 메일 내용
+            必 대충 쓴 메일 내용
           </span>
           <textarea
             value={value.rawDraft}
@@ -240,7 +291,7 @@ export default function MailForm({
 
         <label className="grid gap-2">
           <span className="text-sm font-medium text-slate-700">
-            반드시 포함할 내용
+            必 반드시 포함할 내용
             <span className="ml-1 font-normal text-slate-400">선택</span>
           </span>
           <textarea
@@ -255,7 +306,7 @@ export default function MailForm({
         <div className="grid gap-5 md:grid-cols-2">
           <label className="grid gap-2">
             <span className="text-sm font-medium text-slate-700">
-              메일 목적
+              有 메일 목적
               <span className="ml-1 font-normal text-slate-400">선택</span>
             </span>
             <input
@@ -268,7 +319,7 @@ export default function MailForm({
 
           <label className="grid gap-2">
             <span className="text-sm font-medium text-slate-700">
-              추가 요청사항
+              多 추가 요청사항
               <span className="ml-1 font-normal text-slate-400">선택</span>
             </span>
             <input

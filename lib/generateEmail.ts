@@ -585,6 +585,7 @@ function buildImprovements(ctx: GenerationContext) {
   if (ctx.language === "en") {
     return [
       `Analyzed the rough input and matched it to the ${template.label} structure.`,
+      "Applied the BizMail framework: required facts, useful context, and rewriting direction.",
       "Converted the message into natural global business English rather than a literal translation.",
       `Adjusted the tone to ${toneLabels[ctx.tone]}.`,
       "Kept the content limited to the facts and intent provided by the user.",
@@ -593,6 +594,7 @@ function buildImprovements(ctx: GenerationContext) {
 
   return [
     `입력 내용을 분석해 ${template.label} 구조로 재작성했습니다.`,
+    "必/有/多 입력 프레임워크에 따라 필수 정보, 맥락, 다듬기 방향을 구분했습니다.",
     "말하듯 입력된 표현을 정중한 비즈니스 문장으로 완화했습니다.",
     `${toneLabels[ctx.tone]} 톤에 맞춰 요청사항과 액션을 명확하게 정리했습니다.`,
     "사용자가 제공하지 않은 사실은 임의로 추가하지 않았습니다.",
