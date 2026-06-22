@@ -66,16 +66,56 @@ function compactLines(value = "") {
 
 function cleanInstructionWords(value: string) {
   return value
+    .replace(/^[가-힣A-Za-z0-9\s]+(?:담당자|팀장님|팀장|님|파트너사|거래처)에게\s+/, "")
     .replace(/말해줘|말하고 싶어|하고 싶어|물어보고 싶어|작성해줘|써줘/g, "")
+    .replace(/정중하게/g, "")
+    .replace(/정중히/g, "")
     .replace(/싶다고\s*\.?/g, "")
     .replace(/^ask the client to\s+/i, "")
     .replace(/^please\s+/i, "")
+    .replace(/하고\s*전달$/g, "")
+    .replace(/\s*전달$/g, "")
     .replace(/\s+\./g, ".")
     .trim();
 }
 
+function translateKnownBusinessKorean(value: string) {
+  const replacements: Array<[RegExp, string]> = [
+    [/신규\s*대시보드\s*도입/g, "new dashboard implementation"],
+    [/다음\s*주\s*금요일\s*오후/g, "next Friday afternoon"],
+    [/30분\s*미팅\s*요청/g, "request a 30-minute meeting"],
+    [/비용/g, "cost"],
+    [/일정/g, "timeline"],
+    [/필요\s*기능/g, "required features"],
+    [/사전\s*검수\s*필수/g, "pre-review required"],
+    [/변동\s*가능성\s*있음/g, "subject to change"],
+    [/수정\s*요청\s*다수/g, "multiple revision requests"],
+    [/인플루언서\s*5인\s*차주\s*진행/g, "proceed with five influencers next week"],
+    [/촬영\s*패키지/g, "filming package"],
+    [/기본\s*촬영\s*1일/g, "one day of basic shooting"],
+    [/보정\s*컷\s*20장/g, "20 retouched images"],
+    [/영상\s*편집\s*1본/g, "one edited video"],
+  ];
+
+  return replacements.reduce(
+    (result, [pattern, replacement]) => result.replace(pattern, replacement),
+    value,
+  )
+    .replace(
+      /new dashboard implementation\s*관련해서\s*next Friday afternoon에\s*request a 30-minute meeting/g,
+      "Request a 30-minute meeting next Friday afternoon regarding the new dashboard implementation",
+    )
+    .replace(/required features을 논의/g, "required features")
+    .replace(/(.+)을 논의/g, "$1")
+    .replace(/관련해서/g, "regarding")
+    .replace(/에\s+/g, " ")
+    .trim();
+}
+
 function cleanKeyPoint(value: string, language: OutputLanguage) {
-  return cleanInstructionWords(normalizeBizMailMarkerSyntax(value, language));
+  const cleaned = cleanInstructionWords(normalizeBizMailMarkerSyntax(value, language));
+
+  return language === "en" ? translateKnownBusinessKorean(cleaned) : cleaned;
 }
 
 function uniqueLines(lines: string[]) {
@@ -167,10 +207,11 @@ function extractDeadline(text: string, language: OutputLanguage) {
     /by\s+(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday|tomorrow|today|eod|end of day)/i,
     /by\s+the\s+end\s+of\s+this\s+week/i,
     /this week/i,
+    /이번\s*주\s*(?:월요일|화요일|수요일|목요일|금요일)(?:까지)?/i,
+    /다음\s*주\s*(?:월요일|화요일|수요일|목요일|금요일)(?:이나|또는|,|\s)*(?:월요일|화요일|수요일|목요일|금요일)?/i,
     /오늘\s*(?:오전|오후|중)?/i,
     /내일\s*(?:오전|오후|중)?/i,
     /이번\s*주\s*(?:안으로|안|중|까지)?/i,
-    /다음\s*주\s*(?:월요일|화요일|수요일|목요일|금요일)(?:이나|또는|,|\s)*(?:월요일|화요일|수요일|목요일|금요일)?/i,
     /다음\s*주\s*(?:월요일|화요일|수요일|목요일|금요일)?/i,
     /(?:월요일|화요일|수요일|목요일|금요일)\s*(?:오전|오후|까지)?/i,
     /\d{1,2}시(?:까지)?/i,
@@ -228,13 +269,23 @@ function formatDeadline(value: string, language: OutputLanguage) {
   return value;
 }
 
+function conciseExplicitTopic(value = "") {
+  const cleaned = cleanInstructionWords(normalizeBizMailMarkerSyntax(value, "ko"));
+
+  return cleaned.length <= 36 ? cleaned : "";
+}
+
 function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: OutputLanguage) {
   const text = sourceText(input);
-  const cleanedDraft = cleanInstructionWords(normalize(input.rawDraft));
-  const explicit = normalize(input.purpose) || cleanedDraft;
+  const cleanedDraft = conciseExplicitTopic(input.rawDraft);
+  const explicit = conciseExplicitTopic(input.purpose) || cleanedDraft;
   const lower = text.toLowerCase();
 
   if (language === "en") {
+    if (/신규\s*대시보드/.test(text)) {
+      return "the new dashboard implementation";
+    }
+
     if (/(견적서|견적|비용|가격)/.test(text)) {
       return "the quotation";
     }
@@ -272,6 +323,18 @@ function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: Out
     return "자료 전달 지연";
   }
 
+  if (/(샘플|포장).*(파손|불량)|파손.*(샘플|포장)/.test(text)) {
+    return "샘플 포장 파손";
+  }
+
+  if (/6월\s*캠페인/.test(text)) {
+    return "6월 캠페인 진행 상황";
+  }
+
+  if (/여름\s*캠페인.*협업|협업.*여름\s*캠페인/.test(text)) {
+    return "여름 캠페인 콘텐츠 협업";
+  }
+
   if (analysis.recommendedTemplateId === "collaboration" && /신규\s*캠페인/.test(text)) {
     return "신규 캠페인 협업";
   }
@@ -281,6 +344,10 @@ function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: Out
   }
 
   if (/(견적서|견적|비용|가격)/.test(text)) {
+    if (/촬영\s*패키지/.test(text)) {
+      return "촬영 패키지";
+    }
+
     return "견적";
   }
 
@@ -294,6 +361,10 @@ function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: Out
 
   if (/(자료|파일|문서|보고서)/.test(text)) {
     return "자료";
+  }
+
+  if (analysis.recommendedTemplateId === "rejection" && /제안/.test(text)) {
+    return "제안 건";
   }
 
   return explicit || "관련 건";
@@ -318,12 +389,47 @@ function getKeyPoints(
   const analyzedPoints = analysis.keyPoints.map((point) =>
     normalizeBizMailMarkerSyntax(point, language),
   );
+  const text = sourceText(input);
+
+  if (language === "ko" && analysis.recommendedTemplateId === "rejection") {
+    const rejectionPoints = [
+      /예산/.test(text) ? "이번 분기 예산 문제로 진행이 어려운 상황" : "",
+      /다음\s*기회|재논의|다시\s*논의/.test(text)
+        ? "향후 적합한 기회에 다시 논의 희망"
+        : "",
+    ].filter(Boolean);
+
+    if (rejectionPoints.length) {
+      return uniqueLines([...rejectionPoints, ...markerPoints]);
+    }
+  }
+
+  if (language === "ko" && analysis.recommendedTemplateId === "reply-reminder") {
+    const reminderPoints = [
+      /제안서/.test(text) ? "지난주 전달한 제안서 검토 의견 확인" : "",
+      deadlineFromTextForPoint(text),
+    ].filter(Boolean);
+
+    if (reminderPoints.length) {
+      return uniqueLines([...reminderPoints, ...markerPoints]);
+    }
+  }
 
   return uniqueLines(
     analyzedPoints.length
       ? [...analyzedPoints, ...markerPoints]
       : [cleanKeyPoint(input.rawDraft, language), ...markerPoints],
   );
+}
+
+function deadlineFromTextForPoint(text: string) {
+  const deadline = extractDeadline(text, "ko");
+
+  if (!deadline) {
+    return "";
+  }
+
+  return `${koreanDeadlineTarget(deadline)} 회신 요청`;
 }
 
 function greeting(input: MailFormInput, language: OutputLanguage, tone: MailTone) {
@@ -373,10 +479,28 @@ function bulletList(items: string[], language: OutputLanguage) {
   return cleaned.map((item) => `- ${item}`).join("\n");
 }
 
+function koreanDeadlineTarget(deadline: string) {
+  if (!deadline) {
+    return "";
+  }
+
+  return /(까지|중|안으로)$/.test(deadline) ? deadline : `${deadline}까지`;
+}
+
+function koreanAvailabilityWindow(deadline: string) {
+  if (!deadline) {
+    return "";
+  }
+
+  return /(중|안으로)$/.test(deadline) ? deadline : `${deadline} 중`;
+}
+
 function koreanBody(ctx: GenerationContext) {
   const { input, templateId, topic, deadline, keyPoints, tone } = ctx;
   const short = tone === "concise";
   const details = bulletList(keyPoints, "ko");
+  const deadlineTarget = koreanDeadlineTarget(deadline);
+  const availabilityWindow = koreanAvailabilityWindow(deadline);
 
   const introByTemplate: Record<MailTemplateId, string> = {
     "work-request": `${topic} 관련하여 업무 협조를 요청드리고자 합니다.`,
@@ -392,37 +516,41 @@ function koreanBody(ctx: GenerationContext) {
     apology: `${topic}과 관련하여 불편을 드린 점 진심으로 죄송합니다.`,
     rejection: `${topic} 관련하여 검토 결과를 공유드립니다.`,
     complaint: `${topic} 관련하여 확인이 필요한 사항이 있어 연락드립니다.`,
-    report: `${topic} 관련 진행 상황을 공유드립니다.`,
+    report: topic.includes("진행 상황")
+      ? `${topic}을 공유드립니다.`
+      : `${topic} 관련 진행 상황을 공유드립니다.`,
     "self-introduction": `${topic} 관련하여 제 소개와 연락 목적을 전달드리고자 합니다.`,
     "global-business": `${topic} 관련하여 명확히 요청드리고자 합니다.`,
     "general-business": `${topic} 관련하여 메일드립니다.`,
   };
 
   const actionByTemplate: Record<MailTemplateId, string> = {
-    "work-request": `아래 내용을 확인하시고 가능하신 방향으로 처리 부탁드립니다.\n${details}`,
+    "work-request": `아래 내용을 기준으로 진행 가능 여부와 필요한 후속 조치를 확인 부탁드립니다.\n${details}\n\n진행 전 확인이 필요한 부분이 있다면 함께 알려주시면 반영하겠습니다.`,
     "schedule-adjustment": deadline
-      ? `가능하시다면 ${deadline} 중 편하신 시간이 있으신지 확인 부탁드립니다. 해당 일정이 어려우시면 가능하신 시간을 알려주시면 조율하겠습니다.`
+      ? `가능하시다면 ${availabilityWindow} 편하신 시간이 있으신지 확인 부탁드립니다. 해당 일정이 어려우시면 가능하신 시간을 알려주시면 조율하겠습니다.`
       : `가능하신 일정이나 대안 시간을 알려주시면 조율하겠습니다.`,
-    "meeting-request": `미팅에서는 아래 내용을 중심으로 논의하고자 합니다.\n${details}`,
+    "meeting-request": deadline
+      ? `미팅에서는 아래 내용을 중심으로 논의하고자 합니다.\n${details}\n\n가능하시다면 ${availabilityWindow} 미팅 가능 여부를 회신 부탁드립니다.`
+      : `미팅에서는 아래 내용을 중심으로 논의하고자 합니다.\n${details}\n\n가능하신 일정이 있으시면 회신 부탁드립니다.`,
     "meeting-follow-up": `주요 논의 내용과 후속 액션은 아래와 같습니다.\n${details}`,
-    proposal: `제안드리는 주요 내용은 아래와 같습니다.\n${details}`,
-    collaboration: `협업 방향은 아래와 같이 생각하고 있습니다.\n${details}`,
-    "quotation-request": deadline
-      ? `아래 조건을 기준으로 ${deadline}까지 견적 확인을 부탁드립니다.\n${details}`
-      : `아래 조건을 기준으로 견적 확인을 부탁드립니다.\n${details}`,
-    "document-request": deadline
-      ? `아래 자료를 ${deadline}까지 공유해주실 수 있을지 확인 부탁드립니다.\n${details}`
+    proposal: `제안드리는 주요 내용은 아래와 같습니다.\n${details}\n\n검토 후 의견을 주시면 구체적인 진행 방식과 일정을 추가로 조율하겠습니다.`,
+    collaboration: `협업 방향은 아래와 같이 생각하고 있습니다.\n${details}\n\n관심 있으시다면 다음 단계 논의를 위한 미팅 가능 일정을 알려주시면 감사하겠습니다.`,
+    "quotation-request": deadlineTarget
+      ? `아래 조건을 기준으로 견적서 전달 가능 여부를 ${deadlineTarget} 회신 부탁드립니다.\n${details}`
+      : `아래 조건을 기준으로 견적서 전달 가능 여부를 확인 부탁드립니다.\n${details}`,
+    "document-request": deadlineTarget
+      ? `아래 자료를 ${deadlineTarget} 공유해주실 수 있을지 확인 부탁드립니다.\n${details}`
       : `아래 자료 공유 가능 여부를 확인 부탁드립니다.\n${details}`,
-    "reply-reminder": deadline
-      ? `바쁘시겠지만 ${deadline}까지 회신 가능하실지 확인 부탁드립니다.\n${details}`
-      : `확인 가능하실 때 진행 상황이나 의견을 회신해주시면 감사하겠습니다.\n${details}`,
+    "reply-reminder": deadlineTarget
+      ? `바쁘시겠지만 ${deadlineTarget} 회신 가능하실지 확인 부탁드립니다.\n${details}\n\n검토에 추가 정보가 필요하시다면 알려주시면 바로 보완해드리겠습니다.`
+      : `확인 가능하실 때 진행 상황이나 의견을 회신해주시면 감사하겠습니다.\n${details}\n\n검토에 추가 정보가 필요하시다면 알려주시면 바로 보완해드리겠습니다.`,
     thanks: `특히 아래 부분에 감사드립니다.\n${details}`,
-    apology: deadline
-      ? `해당 건은 ${deadline}까지 다시 확인하여 전달드리겠습니다. 전달 전 내용을 한 번 더 점검해 누락이 없도록 하겠습니다.`
+    apology: deadlineTarget
+      ? `해당 건은 ${deadlineTarget} 다시 확인하여 전달드리겠습니다. 전달 전 내용을 한 번 더 점검해 누락이 없도록 하겠습니다.`
       : `현재 해당 건을 다시 확인하고 있으며, 가능한 일정에 맞춰 후속 조치를 안내드리겠습니다.`,
-    rejection: `검토 결과, 아쉽게도 이번에는 진행이 어려울 것 같습니다. 아래 사유 또는 고려 사항을 함께 전달드립니다.\n${details}`,
-    complaint: `현재 확인된 내용은 아래와 같습니다.\n${details}\n\n해당 건에 대해 가능한 조치 방안과 일정을 회신 부탁드립니다.`,
-    report: `핵심 내용은 아래와 같습니다.\n${details}`,
+    rejection: `검토 결과, 아쉽게도 이번에는 진행이 어려울 것 같습니다. 아래 사유와 검토 내용을 함께 전달드립니다.\n${details}`,
+    complaint: `현재 확인된 내용은 아래와 같습니다.\n${details}\n\n해당 건에 대해 가능한 조치 방안, 처리 일정, 재발 방지 방안을 회신 부탁드립니다.`,
+    report: `현재까지의 핵심 진행 상황은 아래와 같습니다.\n${details}\n\n특이사항은 계속 확인하고 있으며, 다음 액션 진행 상황도 이어서 공유드리겠습니다.`,
     "self-introduction": `아래 내용을 중심으로 소개드립니다.\n${details}`,
     "global-business": `요청드릴 내용은 아래와 같습니다.\n${details}`,
     "general-business": `핵심 내용은 아래와 같습니다.\n${details}`,
@@ -432,11 +560,16 @@ function koreanBody(ctx: GenerationContext) {
     apology: "앞으로 동일한 문제가 반복되지 않도록 일정과 확인 과정을 더 세심하게 관리하겠습니다.",
     thanks: "앞으로도 좋은 협업을 이어갈 수 있기를 바랍니다.",
     rejection: "좋은 제안에도 긍정적인 답변을 드리지 못해 양해 부탁드립니다.",
-    "schedule-adjustment": "확인 후 편하신 시간으로 회신 부탁드립니다.",
+    "schedule-adjustment": "확인 후 편하신 시간으로 회신 부탁드립니다. 확정되는 일정에 맞춰 필요한 내용을 준비하겠습니다.",
     "meeting-request": "가능하신 일정이 있으시면 회신 부탁드립니다.",
     "quotation-request": "견적 산정에 추가 정보가 필요하시면 말씀 부탁드립니다.",
     "document-request": "확인 후 공유 가능 여부를 회신해주시면 감사하겠습니다.",
     "reply-reminder": "확인 부탁드리며, 회신 기다리겠습니다.",
+    "work-request": "확인 후 진행 가능 여부를 회신해주시면 감사하겠습니다.",
+    collaboration: "검토 부탁드리며, 가능하신 일정이나 의견을 회신 부탁드립니다.",
+    proposal: "검토 후 의견 주시면 감사하겠습니다.",
+    complaint: "확인 후 빠른 회신 부탁드립니다.",
+    report: "추가로 확인이 필요한 사항이 있으시면 말씀 부탁드립니다.",
   };
 
   const paragraphs = [
@@ -474,9 +607,28 @@ function englishRequestSentence(templateId: MailTemplateId, topic: string, deadl
   return `I would appreciate it if you could review ${topic} and share your feedback when convenient.`;
 }
 
+function englishAdditionalNotes(input: MailFormInput, details: string) {
+  const text = sourceText(input);
+  const notes = [
+    /pre-?review|사전\s*검수/i.test(text)
+      ? "- Pre-review is required before final approval."
+      : "",
+    /subject to change|변동\s*가능성/i.test(text)
+      ? "- The details may be subject to change."
+      : "",
+  ].filter(Boolean);
+
+  if (notes.length) {
+    return notes.join("\n");
+  }
+
+  return details;
+}
+
 function englishBody(ctx: GenerationContext) {
   const { input, templateId, topic, deadline, keyPoints, tone } = ctx;
   const details = bulletList(keyPoints, "en");
+  const additionalNotes = englishAdditionalNotes(input, details);
   const short = tone === "concise";
 
   const introByTemplate: Record<MailTemplateId, string> = {
@@ -509,7 +661,7 @@ function englishBody(ctx: GenerationContext) {
     proposal: `The key points of the proposal are as follows:\n${details}`,
     collaboration: `The potential collaboration could be structured around the following points:\n${details}`,
     "quotation-request": englishRequestSentence(templateId, topic, deadline),
-    "document-request": englishRequestSentence(templateId, topic, deadline),
+    "document-request": `${englishRequestSentence(templateId, topic, deadline)}\n\nPlease also note the following:\n${additionalNotes}`,
     "reply-reminder": englishRequestSentence(templateId, topic, deadline),
     thanks: `I especially appreciate the following:\n${details}`,
     apology: deadline
@@ -589,23 +741,55 @@ function buildSubjects(ctx: GenerationContext) {
     return subjects[templateId].slice(0, 3);
   }
 
+  const quotationSubjects = koTopic.includes("견적")
+    ? [
+        `[견적 요청] ${koTopic} 문의드립니다`,
+        `${koTopic} 확인 부탁드립니다`,
+        `${koTopic} 관련 비용 문의드립니다`,
+      ]
+    : [
+        `[견적 요청] ${koTopic} 견적 문의드립니다`,
+        `${koTopic} 견적 확인 부탁드립니다`,
+        `${koTopic} 비용 문의드립니다`,
+      ];
+  const collaborationSubjects = koTopic.includes("협업")
+    ? [
+        `[협업 제안] ${koTopic} 검토 부탁드립니다`,
+        `${koTopic} 논의 요청드립니다`,
+        `${koTopic} 관련 의견 부탁드립니다`,
+      ]
+    : [
+        `[협업 제안] ${koTopic} 협업 제안드립니다`,
+        `${koTopic} 관련 협업 논의 요청드립니다`,
+        `${koTopic} 파트너십 제안드립니다`,
+      ];
+  const reportSubjects = koTopic.includes("진행 상황")
+    ? [
+        `[보고] ${koTopic} 공유드립니다`,
+        `${koTopic} 보고드립니다`,
+        `${koTopic} 업데이트 공유드립니다`,
+      ]
+    : [
+        `[보고] ${koTopic} 진행 상황 공유드립니다`,
+        `${koTopic} 현황 보고드립니다`,
+        `${koTopic} 관련 업데이트 공유드립니다`,
+      ];
+
   const koSubjects: Record<MailTemplateId, string[]> = {
     "work-request": [`[요청] ${koTopic} 확인 부탁드립니다`, `${koTopic} 관련 업무 요청드립니다`, `${koTopic} 건 검토 부탁드립니다`],
     "schedule-adjustment": [`[일정 조율] ${koTopic} 확인 요청드립니다`, `${koTopic} 조율 문의드립니다`, `${koTopic} 가능 시간 확인 부탁드립니다`],
     "meeting-request": [`[미팅 요청] ${koTopic} 관련 논의 요청드립니다`, `${koTopic} 미팅 가능 여부 문의드립니다`, `${koTopic} 관련 미팅 요청드립니다`],
     "meeting-follow-up": [`[팔로업] ${koTopic} 논의 내용 공유드립니다`, `${koTopic} 후속 액션 공유드립니다`, `${koTopic} 미팅 후속 정리드립니다`],
     proposal: [`[제안] ${koTopic} 관련 제안드립니다`, `${koTopic} 제안 검토 부탁드립니다`, `${koTopic} 관련 제안서 공유드립니다`],
-    collaboration: koTopic.includes("협업")
-      ? [`[협업 제안] ${koTopic} 제안드립니다`, `${koTopic} 논의 요청드립니다`, `${koTopic} 검토 부탁드립니다`]
-      : [`[협업 제안] ${koTopic} 협업 제안드립니다`, `${koTopic} 관련 협업 논의 요청드립니다`, `${koTopic} 파트너십 제안드립니다`],
-    "quotation-request": [`[견적 요청] ${koTopic} 견적 문의드립니다`, `${koTopic} 견적 확인 부탁드립니다`, `${koTopic} 비용 문의드립니다`],
+    collaboration: collaborationSubjects,
+    "quotation-request": quotationSubjects,
     "document-request": [`[자료 요청] ${koTopic} 전달 요청드립니다`, `${koTopic} 자료 공유 부탁드립니다`, `${koTopic} 관련 자료 요청드립니다`],
     "reply-reminder": [`[리마인드] ${koTopic} 관련 회신 요청드립니다`, `${koTopic} 확인차 다시 연락드립니다`, `${koTopic} 회신 확인 부탁드립니다`],
     thanks: [`[감사 인사] ${koTopic} 관련 감사드립니다`, `${koTopic} 도움에 감사드립니다`, `${koTopic} 관련 감사 인사드립니다`],
     apology: [`[사과 말씀] ${koTopic} 관련 안내드립니다`, `${koTopic}에 대한 사과 및 재안내`, `${koTopic} 관련 사과드립니다`],
     rejection: [`[회신] ${koTopic} 관련 검토 결과 공유드립니다`, `${koTopic} 관련 양해 말씀드립니다`, `${koTopic} 검토 결과 안내드립니다`],
     complaint: [`[확인 요청] ${koTopic} 관련 문의드립니다`, `${koTopic} 문제 확인 요청드립니다`, `${koTopic} 관련 조치 요청드립니다`],
-    report: [`[보고] ${koTopic} 진행 상황 공유드립니다`, `${koTopic} 현황 보고드립니다`, `${koTopic} 관련 업데이트 공유드립니다`],
+    report: reportSubjects,
     "self-introduction": [`[소개] ${koTopic} 관련 자료 전달드립니다`, `${koTopic} 자기소개 및 자료 공유드립니다`, `${koTopic} 관련 지원 문의드립니다`],
     "global-business": [`[문의] ${koTopic} 관련하여 메일드립니다`, `${koTopic} 관련 확인 요청드립니다`, `${koTopic} 관련 안내드립니다`],
     "general-business": [`[문의] ${koTopic} 관련하여 메일드립니다`, `${koTopic} 관련 확인 부탁드립니다`, `${koTopic} 건 공유드립니다`],

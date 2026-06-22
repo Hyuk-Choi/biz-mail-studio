@@ -37,7 +37,24 @@ const templateRules: TemplateRule[] = [
     situation: "문제나 불만을 차분하게 전달해야 하는 상황",
     purpose: "문제 상황을 설명하고 해결 또는 답변을 요청",
     tone: "firm",
-    keywords: ["문제", "불만", "클레임", "오류", "개선 요청", "환불", "해결 요청", "issue", "complaint"],
+    keywords: [
+      "문제",
+      "불만",
+      "클레임",
+      "오류",
+      "개선 요청",
+      "환불",
+      "해결 요청",
+      "파손",
+      "불량",
+      "누락",
+      "교환",
+      "재발 방지",
+      "납품",
+      "조치",
+      "issue",
+      "complaint",
+    ],
     priority: 95,
   },
   {
@@ -284,6 +301,22 @@ function compactLines(value = "") {
     .filter((line) => line.length > 1);
 }
 
+function cleanDraftSegment(value: string) {
+  return value
+    .replace(/말해줘|말하고 싶어|하고 싶어|물어보고 싶어|작성해줘|써줘/g, "")
+    .replace(/정중하게/g, "")
+    .replace(/싶다고\s*\.?/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function splitDraftSegments(value = "") {
+  return stripBizMailMarkerSegments(value)
+    .split(/\n|,|，|;|；|•|\.\s*/)
+    .map(cleanDraftSegment)
+    .filter((line) => line.length > 1);
+}
+
 function uniqueLines(lines: string[]) {
   const seen = new Set<string>();
 
@@ -311,25 +344,15 @@ function extractKeyPoints(input: MailFormInput, templateId: MailTemplateId) {
     return uniqueLines([...explicit, ...markerPoints]).slice(0, 6);
   }
 
-  const draft = normalize(stripBizMailMarkerSegments(input.rawDraft));
+  const draftSegments = splitDraftSegments(input.rawDraft);
 
-  if (!draft) {
+  if (!draftSegments.length) {
     return markerPoints.length
       ? markerPoints.slice(0, 6)
       : ["입력된 초안의 핵심 내용을 비즈니스 문장으로 정리"];
   }
 
-  if (templateId === "apology" && /(오늘 오후|오늘 중|내일|금요일|이번 주)/.test(draft)) {
-    return uniqueLines([
-      draft.replace(/말해줘|말하고 싶어|하고 싶어/g, "").trim(),
-      ...markerPoints,
-    ]).slice(0, 6);
-  }
-
-  return uniqueLines([
-    draft.replace(/말해줘|말하고 싶어|하고 싶어|물어보고 싶어/g, "").trim(),
-    ...markerPoints,
-  ]).slice(0, 6);
+  return uniqueLines([...draftSegments, ...markerPoints]).slice(0, 6);
 }
 
 function requestedActions(templateId: MailTemplateId) {
