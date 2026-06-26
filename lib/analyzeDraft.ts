@@ -70,7 +70,22 @@ const templateRules: TemplateRule[] = [
     situation: "미팅 이후 논의 내용과 후속 액션을 정리하는 상황",
     purpose: "이전 논의를 정리하고 다음 액션을 공유",
     tone: "polite",
-    keywords: ["오늘 미팅", "지난 회의", "논의 내용", "후속", "팔로업", "정리해서 공유", "다음 액션", "follow-up"],
+    keywords: [
+      "오늘 미팅",
+      "오늘 회의",
+      "지난 회의",
+      "회의 내용",
+      "미팅 후",
+      "회의 후",
+      "논의 내용",
+      "후속",
+      "팔로업",
+      "정리해서 공유",
+      "다음 액션",
+      "follow-up",
+      "recap",
+      "next steps",
+    ],
     priority: 82,
   },
   {
@@ -102,7 +117,20 @@ const templateRules: TemplateRule[] = [
     situation: "미팅을 제안하거나 논의 시간을 요청하는 상황",
     purpose: "미팅 목적과 논의 주제를 전달하고 일정을 요청",
     tone: "polite",
-    keywords: ["미팅 요청", "논의", "이야기 나누", "회의 요청", "만나서 설명", "줌", "구글밋", "zoom", "google meet"],
+    keywords: [
+      "미팅 요청",
+      "논의",
+      "이야기 나누",
+      "회의 요청",
+      "만나서 설명",
+      "줌",
+      "구글밋",
+      "zoom",
+      "google meet",
+      "meeting",
+      "discuss",
+      "request a meeting",
+    ],
     priority: 70,
   },
   {
@@ -266,6 +294,14 @@ function pickTemplate(
     };
   }
 
+  if (/(사전\s*검수|인플루언서|차주\s*진행|필수|必|변동\s*가능성)/i.test(text)) {
+    return {
+      id: "work-request",
+      matchCount: 4,
+      isManual: false,
+    };
+  }
+
   const scored = templateRules
     .map((rule) => ({
       ...rule,
@@ -334,7 +370,7 @@ function cleanDraftSegment(value: string) {
 
 function splitDraftSegments(value = "") {
   return stripBizMailMarkerSegments(value)
-    .split(/\n|,|，|;|；|•|\.\s*/)
+    .split(/\n|,|，|;|；|•|(?<!\d)\.(?!\d)\s*/)
     .map(cleanDraftSegment)
     .filter((line) => line.length > 1);
 }

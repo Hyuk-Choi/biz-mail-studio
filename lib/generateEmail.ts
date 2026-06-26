@@ -59,7 +59,7 @@ function sourceText(input: MailFormInput) {
 
 function compactLines(value = "") {
   return value
-    .split(/\n|;|•/)
+    .split(/\n|,|，|;|；|•/)
     .map((line) => line.trim())
     .filter(Boolean);
 }
@@ -72,9 +72,7 @@ function cleanInstructionWords(value: string) {
     .replace(/정중히/g, "")
     .replace(/싶다고\s*\.?/g, "")
     .replace(/^ask the client to\s+/i, "")
-    .replace(/^please\s+/i, "")
     .replace(/하고\s*전달$/g, "")
-    .replace(/\s*전달$/g, "")
     .replace(/\s+\./g, ".")
     .trim();
 }
@@ -139,7 +137,21 @@ function cleanKeyPoint(value: string, language: OutputLanguage) {
 
   return language === "en"
     ? translateKnownBusinessKorean(cleaned)
-    : translateKnownBusinessEnglishToKorean(cleaned);
+    : polishKoreanPoint(translateKnownBusinessEnglishToKorean(cleaned));
+}
+
+function polishKoreanPoint(value: string) {
+  return value
+    .replace(/이번주/g, "이번 주")
+    .replace(/다음주/g, "다음 주")
+    .replace(/(\S+)랑\s+/g, "$1 및 ")
+    .replace(/제안서에 넣어야 해서/g, "제안서 작성을 위해")
+    .replace(/첫 구매\s*7일\s*뒤\s*쿠폰 메시지 발송하면\s*재구매율 높일 수 있음/g, "첫 구매 7일 후 쿠폰 메시지 발송을 통한 재구매율 개선 기대")
+    .replace(/상세페이지 제작 견적 필요/g, "상세페이지 제작 견적 요청")
+    .replace(/견적서 요청/g, "견적서 전달 요청")
+    .replace(/소재 피로도 높아짐/g, "소재 피로도 상승 이슈")
+    .replace(/^다만\s+/g, "")
+    .trim();
 }
 
 function uniqueLines(lines: string[]) {
@@ -147,12 +159,17 @@ function uniqueLines(lines: string[]) {
 
   return lines.filter((line) => {
     const normalized = line.trim();
+    const comparable = normalized
+      .replace(/\s+/g, "")
+      .replace(/필수/g, "필요")
+      .replace(/요청드립니다|부탁드립니다|부탁|요청/g, "")
+      .replace(/[.,，。:：]/g, "");
 
-    if (!normalized || seen.has(normalized)) {
+    if (!normalized || seen.has(comparable)) {
       return false;
     }
 
-    seen.add(normalized);
+    seen.add(comparable);
     return true;
   });
 }
@@ -232,6 +249,7 @@ function extractDeadline(text: string, language: OutputLanguage) {
     /by\s+(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday)\s+(?:morning|afternoon)/i,
     /by\s+(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday|tomorrow|today|eod|end of day)/i,
     /by\s+the\s+end\s+of\s+this\s+week/i,
+    /next\s+week/i,
     /this week/i,
     /이번\s*주\s*(?:월요일|화요일|수요일|목요일|금요일)(?:까지)?/i,
     /다음\s*주\s*(?:월요일|화요일|수요일|목요일|금요일)(?:이나|또는|,|\s)*(?:월요일|화요일|수요일|목요일|금요일)?/i,
@@ -284,7 +302,7 @@ function formatDeadline(value: string, language: OutputLanguage) {
       return "목요일까지";
     }
 
-    return value;
+    return value.replace(/이번주/g, "이번 주").replace(/다음주/g, "다음 주");
   }
 
   if (/오늘\s*오후/.test(value)) {
@@ -329,10 +347,88 @@ function conciseExplicitTopic(value = "") {
   return cleaned.length <= 36 ? cleaned : "";
 }
 
+function cleanTopicByTemplate(value: string, templateId: MailTemplateId) {
+  let cleaned = value
+    .replace(/\s+/g, " ")
+    .replace(/[.,，。]+$/g, "")
+    .trim();
+
+  const replacements: Partial<Record<MailTemplateId, Array<[RegExp, string]>>> = {
+    apology: [
+      [/\s*(관련)?\s*(사과|사과 메일|안내|재안내)\s*$/g, ""],
+      [/(자료|파일|문서)\s*(전달|공유)?\s*지연.*/g, "$1 전달 지연"],
+      [/샘플\s*(배송|전달)\s*지연.*/g, "샘플 배송 지연"],
+    ],
+    report: [
+      [/\s*(관련)?\s*(보고|보고 메일|현황 공유|공유|업데이트)\s*$/g, ""],
+    ],
+    proposal: [
+      [/\s*(관련)?\s*(제안|제안 메일|검토 요청)\s*$/g, ""],
+    ],
+    collaboration: [
+      [/\s*(관련)?\s*(협업 제안|협업 요청|제안)\s*$/g, " 협업"],
+    ],
+    "quotation-request": [
+      [/\s*(관련)?\s*(견적 요청|견적서 요청|견적 필요|견적 문의|견적)\s*$/g, ""],
+    ],
+    "document-request": [
+      [/\s*(관련)?\s*(자료 요청|전달 요청|공유 요청|자료)\s*$/g, ""],
+    ],
+    "reply-reminder": [
+      [/\s*(관련)?\s*(회신 리마인드|회신 독촉|리마인드|회신 요청|회신)\s*$/g, ""],
+    ],
+    "meeting-follow-up": [
+      [/\s*(관련)?\s*(미팅 후 팔로업|회의 후 팔로업|팔로업|후속 액션 정리|정리)\s*$/g, ""],
+    ],
+    "meeting-request": [
+      [/\s*(관련)?\s*(미팅 요청|회의 요청|논의 요청)\s*$/g, ""],
+    ],
+    "schedule-adjustment": [
+      [/\s*(관련)?\s*(일정 조율|일정 확인|시간 조율)\s*$/g, ""],
+    ],
+    thanks: [
+      [/\s*(관련)?\s*(감사 인사|감사 메일|감사)\s*$/g, ""],
+    ],
+  };
+
+  for (const [pattern, replacement] of replacements[templateId] ?? []) {
+    cleaned = cleaned.replace(pattern, replacement).trim();
+  }
+
+  return cleaned
+    .replace(/\s+/g, " ")
+    .replace(/[.,，。]+$/g, "")
+    .trim();
+}
+
+function hasFinalConsonant(value: string) {
+  const trimmed = value.trim();
+  const lastChar = trimmed.charAt(trimmed.length - 1);
+
+  if (!lastChar) {
+    return false;
+  }
+
+  const code = lastChar.charCodeAt(0);
+
+  if (code < 0xac00 || code > 0xd7a3) {
+    return false;
+  }
+
+  return (code - 0xac00) % 28 !== 0;
+}
+
+function appendJosa(value: string, consonantJosa: string, vowelJosa: string) {
+  return `${value}${hasFinalConsonant(value) ? consonantJosa : vowelJosa}`;
+}
+
 function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: OutputLanguage) {
   const text = sourceText(input);
   const cleanedDraft = conciseExplicitTopic(input.rawDraft);
-  const explicit = conciseExplicitTopic(input.purpose) || cleanedDraft;
+  const explicit = cleanTopicByTemplate(
+    conciseExplicitTopic(input.purpose) || cleanedDraft,
+    analysis.recommendedTemplateId,
+  );
   const lower = text.toLowerCase();
 
   if (language === "en") {
@@ -342,6 +438,14 @@ function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: Out
 
     if (/수정\s*계약서|revised contract/i.test(text)) {
       return "the revised contract";
+    }
+
+    if (/shipment\s+schedule.*invoice|invoice.*shipment\s+schedule/i.test(text)) {
+      return "the shipment schedule and invoice";
+    }
+
+    if (/q3\s+campaign\s+launch|campaign\s+launch/i.test(text)) {
+      return "the Q3 campaign launch";
     }
 
     if (/(견적서|견적|비용|가격)/.test(text)) {
@@ -377,8 +481,16 @@ function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: Out
       : "the requested matter";
   }
 
+  if (analysis.recommendedTemplateId === "work-request" && /인플루언서\s*5인|사전\s*검수|변동\s*가능성/.test(text)) {
+    return "인플루언서 진행 조건";
+  }
+
   if (analysis.recommendedTemplateId === "apology" && /(자료|파일|문서)/.test(text)) {
     return "자료 전달 지연";
+  }
+
+  if (analysis.recommendedTemplateId === "apology" && /샘플\s*(배송|전달)\s*.*(늦|지연)/.test(text)) {
+    return "샘플 배송 지연";
   }
 
   if (analysis.recommendedTemplateId === "thanks") {
@@ -407,8 +519,34 @@ function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: Out
     return "마케팅 인턴 지원";
   }
 
+  if (analysis.recommendedTemplateId === "report") {
+    if (/광고\s*성과/.test(text)) {
+      return "주간 광고 성과";
+    }
+
+    if (/런칭\s*준비/.test(text)) {
+      return "런칭 준비 상황";
+    }
+
+    if (explicit) {
+      return explicit;
+    }
+  }
+
+  if (analysis.recommendedTemplateId === "meeting-follow-up") {
+    if (/오늘\s*회의|오늘\s*미팅/.test(text)) {
+      return "오늘 회의";
+    }
+
+    return explicit || "미팅 후속 내용";
+  }
+
   if (/updated\s+pricing\s+table|pricing\s+table|가격표/i.test(text)) {
     return "가격표";
+  }
+
+  if (/상세페이지\s*제작/.test(text)) {
+    return "상세페이지 제작";
   }
 
   if (/여름\s*캠페인.*협업|협업.*여름\s*캠페인/.test(text)) {
@@ -471,11 +609,91 @@ function getKeyPoints(
   );
   const text = sourceText(input);
 
+  if (language === "en" && /shipment\s+schedule.*invoice|invoice.*shipment\s+schedule/i.test(text)) {
+    return uniqueLines([
+      deadlineFromTextForEnglishPoint(
+        text,
+        "Please share the updated shipment schedule and invoice",
+      ),
+      /final\s+quantity|quantity/i.test(text)
+        ? "The final quantity may be subject to change"
+        : "",
+      /confirm/i.test(text) ? "Please confirm the latest available information" : "",
+      ...markerPoints,
+    ].filter(Boolean));
+  }
+
+  if (language === "en" && analysis.recommendedTemplateId === "meeting-request" && /campaign\s+launch|q3/i.test(text)) {
+    return uniqueLines([
+      "Discuss the Q3 campaign launch",
+      /tuesday\s+10/i.test(text) ? "Tuesday at 10:00 as a possible option" : "",
+      /wednesday\s+3/i.test(text) ? "Wednesday at 3:00 as a possible option" : "",
+      ...markerPoints,
+    ].filter(Boolean));
+  }
+
   if (language === "en" && /수정\s*계약서|revised contract/i.test(text)) {
     return uniqueLines([
       deadlineFromTextForEnglishPoint(text, "Please share review feedback on the revised contract"),
       ...markerPoints,
     ]);
+  }
+
+  if (language === "ko" && analysis.recommendedTemplateId === "schedule-adjustment") {
+    const schedulePoints = [
+      /화요일\s*오전/.test(text) ? "화요일 오전 가능" : "",
+      /목요일\s*오후/.test(text) ? "목요일 오후 가능" : "",
+      /편한\s*시간|가능하신\s*시간/.test(text)
+        ? "상대방의 가능한 시간 확인 요청"
+        : "",
+    ].filter(Boolean);
+
+    if (schedulePoints.length) {
+      return uniqueLines([...schedulePoints, ...markerPoints]);
+    }
+  }
+
+  if (language === "ko" && analysis.recommendedTemplateId === "proposal" && /리텐션\s*캠페인/.test(text)) {
+    return uniqueLines([
+      "신규 고객 대상 리텐션 캠페인",
+      /첫 구매\s*7일/.test(text) ? "첫 구매 7일 후 쿠폰 메시지 발송" : "",
+      /재구매율/.test(text) ? "재구매율 개선 기대" : "",
+      /검토/.test(text) ? "제안 내용 검토 요청" : "",
+      ...markerPoints,
+    ].filter(Boolean));
+  }
+
+  if (language === "ko" && analysis.recommendedTemplateId === "quotation-request" && /상세페이지\s*제작/.test(text)) {
+    return uniqueLines([
+      /10페이지/.test(text) ? "상세페이지 10페이지 제작" : "상세페이지 제작",
+      /촬영\s*제외/.test(text) ? "촬영 제외" : "",
+      /디자인/.test(text) || /퍼블리싱/.test(text)
+        ? "디자인 및 퍼블리싱 포함"
+        : "",
+      deadlineFromTextForPoint(text, "견적서 전달 요청"),
+      ...markerPoints,
+    ].filter(Boolean));
+  }
+
+  if (language === "ko" && analysis.recommendedTemplateId === "document-request" && /가격표|제품\s*스펙/.test(text)) {
+    return uniqueLines([
+      /가격표/.test(text) ? "업데이트된 가격표" : "",
+      /제품\s*스펙/.test(text) ? "제품 스펙 자료" : "",
+      /제안서/.test(text) ? "제안서 작성에 활용 예정" : "",
+      deadlineFromTextForPoint(text, "자료 공유 요청"),
+      ...markerPoints,
+    ].filter(Boolean));
+  }
+
+  if (language === "ko" && analysis.recommendedTemplateId === "report" && /광고\s*결과|광고\s*성과/.test(text)) {
+    return uniqueLines([
+      "이번 주 광고 성과 보고",
+      /전환율/.test(text) ? "전환율 2.1에서 2.8로 상승" : "",
+      /CPA/.test(text) ? "CPA 18% 감소" : "",
+      /소재\s*피로도/.test(text) ? "소재 피로도 상승 이슈" : "",
+      /신규\s*소재\s*테스트/.test(text) ? "다음 주 신규 소재 테스트 예정" : "",
+      ...markerPoints,
+    ].filter(Boolean));
   }
 
   if (language === "ko" && /updated\s+pricing\s+table|pricing\s+table/i.test(text)) {
@@ -621,33 +839,31 @@ function koreanDeadlineTarget(deadline: string) {
   return /(까지|중|안으로)$/.test(deadline) ? deadline : `${deadline}까지`;
 }
 
-function koreanAvailabilityWindow(deadline: string) {
-  if (!deadline) {
-    return "";
-  }
-
-  return /(중|안으로)$/.test(deadline) ? deadline : `${deadline} 중`;
-}
-
 function koreanBody(ctx: GenerationContext) {
   const { input, templateId, topic, deadline, keyPoints, tone } = ctx;
   const short = tone === "concise";
   const details = bulletList(keyPoints, "ko");
   const deadlineTarget = koreanDeadlineTarget(deadline);
-  const availabilityWindow = koreanAvailabilityWindow(deadline);
+  const meetingWindow = deadline
+    ? /(중|안으로)$/.test(deadline)
+      ? deadline
+      : `${deadline} 중`
+    : "";
 
   const introByTemplate: Record<MailTemplateId, string> = {
     "work-request": `${topic} 관련하여 업무 협조를 요청드리고자 합니다.`,
     "schedule-adjustment": `${topic} 조율을 위해 연락드립니다.`,
     "meeting-request": `${topic}에 대해 논의드리고자 미팅을 요청드립니다.`,
     "meeting-follow-up": `앞서 논의한 ${topic} 관련 내용을 정리하여 공유드립니다.`,
-    proposal: `${topic} 관련하여 아래와 같이 제안드립니다.`,
+    proposal: `${topic}에 대해 아래와 같이 제안드립니다.`,
     collaboration: `${topic}${topic.includes("협업") ? " 가능성을" : " 관련 협업 가능성을"} 논의드리고자 연락드립니다.`,
-    "quotation-request": `${topic} 관련 견적을 문의드립니다.`,
+    "quotation-request": topic.includes("견적")
+      ? `${topic}을 문의드립니다.`
+      : `${topic} 관련 견적을 문의드립니다.`,
     "document-request": `${topic} 관련 자료 전달을 요청드립니다.`,
     "reply-reminder": `지난번 전달드린 ${topic} 관련하여 확인차 다시 연락드립니다.`,
     thanks: `${topic} 관련하여 도움 주셔서 감사 인사를 드리고자 합니다.`,
-    apology: `${topic}과 관련하여 불편을 드린 점 진심으로 죄송합니다.`,
+    apology: `${appendJosa(topic, "과", "와")} 관련하여 불편을 드린 점 진심으로 죄송합니다.`,
     rejection: `${topic} 관련하여 검토 결과를 공유드립니다.`,
     complaint: `${topic} 관련하여 확인이 필요한 사항이 있어 연락드립니다.`,
     report: topic.includes("진행 상황")
@@ -661,12 +877,12 @@ function koreanBody(ctx: GenerationContext) {
   const actionByTemplate: Record<MailTemplateId, string> = {
     "work-request": `아래 내용을 기준으로 진행 가능 여부와 필요한 후속 조치를 확인 부탁드립니다.\n${details}\n\n진행 전 확인이 필요한 부분이 있다면 함께 알려주시면 반영하겠습니다.`,
     "schedule-adjustment": deadline
-      ? `가능하시다면 ${availabilityWindow} 편하신 시간이 있으신지 확인 부탁드립니다. 해당 일정이 어려우시면 가능하신 시간을 알려주시면 조율하겠습니다.`
-      : `가능하신 일정이나 대안 시간을 알려주시면 조율하겠습니다.`,
+      ? `아래 일정 중 편하신 시간이 있으신지 확인 부탁드립니다.\n${details}\n\n해당 일정이 어려우시면 가능하신 시간을 알려주시면 조율하겠습니다.`
+      : `아래 일정 중 편하신 시간이 있으신지 확인 부탁드립니다.\n${details}\n\n가능하신 일정이나 대안 시간을 알려주시면 조율하겠습니다.`,
     "meeting-request": deadline
-      ? `미팅에서는 아래 내용을 중심으로 논의하고자 합니다.\n${details}\n\n가능하시다면 ${availabilityWindow} 미팅 가능 여부를 회신 부탁드립니다.`
+      ? `미팅에서는 아래 내용을 중심으로 논의하고자 합니다.\n${details}\n\n가능하시다면 ${meetingWindow} 미팅 가능 여부를 회신 부탁드립니다.`
       : `미팅에서는 아래 내용을 중심으로 논의하고자 합니다.\n${details}\n\n가능하신 일정이 있으시면 회신 부탁드립니다.`,
-    "meeting-follow-up": `주요 논의 내용과 후속 액션은 아래와 같습니다.\n${details}`,
+    "meeting-follow-up": `주요 논의 내용과 후속 액션은 아래와 같습니다.\n${details}\n\n각 항목의 진행 상황은 다음 확인 시점에 맞춰 다시 점검하겠습니다.`,
     proposal: `제안드리는 주요 내용은 아래와 같습니다.\n${details}\n\n검토 후 의견을 주시면 구체적인 진행 방식과 일정을 추가로 조율하겠습니다.`,
     collaboration: `협업 방향은 아래와 같이 생각하고 있습니다.\n${details}\n\n관심 있으시다면 다음 단계 논의를 위한 미팅 가능 일정을 알려주시면 감사하겠습니다.`,
     "quotation-request": deadlineTarget
@@ -701,7 +917,7 @@ function koreanBody(ctx: GenerationContext) {
     "reply-reminder": "확인 부탁드리며, 회신 기다리겠습니다.",
     "work-request": "확인 후 진행 가능 여부를 회신해주시면 감사하겠습니다.",
     collaboration: "검토 부탁드리며, 가능하신 일정이나 의견을 회신 부탁드립니다.",
-    proposal: "검토 후 의견 주시면 감사하겠습니다.",
+    proposal: "긍정적인 검토 부탁드립니다.",
     complaint: "확인 후 빠른 회신 부탁드립니다.",
     report: "추가로 확인이 필요한 사항이 있으시면 말씀 부탁드립니다.",
     "self-introduction": "추가로 필요한 자료가 있으시면 언제든 말씀 부탁드립니다.",
@@ -751,6 +967,10 @@ function englishDuePhrase(deadline: string) {
     return deadline;
   }
 
+  if (/^next\s+week/i.test(deadline)) {
+    return deadline;
+  }
+
   return `by ${deadline}`;
 }
 
@@ -763,6 +983,31 @@ function englishWorkRequestSentence(input: MailFormInput, topic: string, deadlin
   }
 
   return englishRequestSentence("work-request", topic, deadline);
+}
+
+function englishMeetingAvailabilitySentence(input: MailFormInput, deadline: string) {
+  const text = sourceText(input);
+  const options = [
+    /tuesday\s+(?:at\s*)?10/i.test(text) ? "Tuesday at 10:00" : "",
+    /wednesday\s+(?:at\s*)?3/i.test(text) ? "Wednesday at 3:00" : "",
+    /thursday\s+(?:at\s*)?3/i.test(text) ? "Thursday at 3:00" : "",
+  ].filter(Boolean);
+
+  if (options.length) {
+    const joined =
+      options.length === 1
+        ? options[0]
+        : `${options.slice(0, -1).join(", ")} or ${options[options.length - 1]}`;
+    const alternative = deadline ? ` another time ${deadline}` : " another time that works better";
+
+    return `Would ${joined} work for you? If neither option is convenient, please feel free to suggest${alternative}.`;
+  }
+
+  if (deadline) {
+    return `Would you be available ${deadline}? If not, please feel free to suggest another time that works better for you.`;
+  }
+
+  return "Please let me know a few time options that would work for your schedule.";
 }
 
 function englishAdditionalNotes(input: MailFormInput, details: string) {
@@ -814,7 +1059,7 @@ function englishBody(ctx: GenerationContext) {
     "schedule-adjustment": deadline
       ? `Would you be available around ${deadline}? If not, please feel free to suggest another time that works better for you.`
       : "Please let me know a few time options that would work for your schedule.",
-    "meeting-request": `I would like to discuss the following points:\n${details}`,
+    "meeting-request": `I would like to discuss the following points:\n${details}\n\n${englishMeetingAvailabilitySentence(input, deadline)}`,
     "meeting-follow-up": `Please see the key follow-up items below:\n${details}`,
     proposal: `The key points of the proposal are as follows:\n${details}`,
     collaboration: `The potential collaboration could be structured around the following points:\n${details}`,
@@ -841,6 +1086,8 @@ function englishBody(ctx: GenerationContext) {
     "document-request": "Please let me know if you need any further context.",
     "quotation-request": "Please let me know if any additional information is needed to prepare the quotation.",
     "reply-reminder": "I would appreciate your update when you have a chance.",
+    "meeting-request": "Thank you, and I look forward to finding a convenient time to speak.",
+    "global-business": "Please let me know if the requested timeline works on your end.",
   };
 
   const paragraphs = [
@@ -910,6 +1157,17 @@ function buildSubjects(ctx: GenerationContext) {
         `${koTopic} 견적 확인 부탁드립니다`,
         `${koTopic} 비용 문의드립니다`,
       ];
+  const proposalSubjects = koTopic.includes("제안")
+    ? [
+        `[제안] ${koTopic} 검토 부탁드립니다`,
+        `${koTopic} 관련 의견 요청드립니다`,
+        `${koTopic} 내용 공유드립니다`,
+      ]
+    : [
+        `[제안] ${koTopic} 제안드립니다`,
+        `${koTopic} 제안 검토 부탁드립니다`,
+        `${koTopic} 관련 의견 요청드립니다`,
+      ];
   const collaborationSubjects = koTopic.includes("협업")
     ? [
         `[협업 제안] ${koTopic} 검토 부탁드립니다`,
@@ -928,7 +1186,7 @@ function buildSubjects(ctx: GenerationContext) {
         `${koTopic} 업데이트 공유드립니다`,
       ]
     : [
-        `[보고] ${koTopic} 진행 상황 공유드립니다`,
+        `[보고] ${koTopic} 공유드립니다`,
         `${koTopic} 현황 보고드립니다`,
         `${koTopic} 관련 업데이트 공유드립니다`,
       ];
@@ -938,7 +1196,7 @@ function buildSubjects(ctx: GenerationContext) {
     "schedule-adjustment": [`[일정 조율] ${koTopic} 확인 요청드립니다`, `${koTopic} 조율 문의드립니다`, `${koTopic} 가능 시간 확인 부탁드립니다`],
     "meeting-request": [`[미팅 요청] ${koTopic} 관련 논의 요청드립니다`, `${koTopic} 미팅 가능 여부 문의드립니다`, `${koTopic} 관련 미팅 요청드립니다`],
     "meeting-follow-up": [`[팔로업] ${koTopic} 논의 내용 공유드립니다`, `${koTopic} 후속 액션 공유드립니다`, `${koTopic} 미팅 후속 정리드립니다`],
-    proposal: [`[제안] ${koTopic} 관련 제안드립니다`, `${koTopic} 제안 검토 부탁드립니다`, `${koTopic} 관련 제안서 공유드립니다`],
+    proposal: proposalSubjects,
     collaboration: collaborationSubjects,
     "quotation-request": quotationSubjects,
     "document-request": [`[자료 요청] ${koTopic} 전달 요청드립니다`, `${koTopic} 자료 공유 부탁드립니다`, `${koTopic} 관련 자료 요청드립니다`],

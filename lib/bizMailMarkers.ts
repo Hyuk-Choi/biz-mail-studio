@@ -74,7 +74,7 @@ function markerFromPhrase(phrase: string): BizMailMarkerInsight | null {
 
 function splitMemoSegments(value: string) {
   return value
-    .split(/\n|,|，|;|；|•|\//)
+    .split(/\n|,|，|;|；|•|\/|(?<!\d)\.(?!\d)/)
     .map((segment) => segment.trim())
     .filter(Boolean);
 }
