@@ -235,12 +235,34 @@ function countMatches(text: string, keywords: string[]) {
   );
 }
 
-function pickTemplate(input: MailFormInput, text: string) {
+function pickTemplate(
+  input: MailFormInput,
+  text: string,
+): { id: MailTemplateId; matchCount: number; isManual: boolean } {
   if (input.templateMode === "manual" && input.selectedTemplateId) {
     return {
       id: input.selectedTemplateId,
       matchCount: 4,
       isManual: true,
+    };
+  }
+
+  if (
+    /(감사|고맙|덕분|thanks|appreciate)/i.test(text) &&
+    !/(죄송|사과|불편|파손|불량|클레임|거절|어렵다|불가|unfortunately|decline|논의\s*내용|후속|팔로업|다음\s*액션|follow-up)/i.test(text)
+  ) {
+    return {
+      id: "thanks",
+      matchCount: 4,
+      isManual: false,
+    };
+  }
+
+  if (/share.*pricing\s+table|updated\s+pricing\s+table|가격표.*공유/i.test(text)) {
+    return {
+      id: "document-request",
+      matchCount: 4,
+      isManual: false,
     };
   }
 

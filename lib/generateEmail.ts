@@ -83,7 +83,10 @@ function translateKnownBusinessKorean(value: string) {
   const replacements: Array<[RegExp, string]> = [
     [/신규\s*대시보드\s*도입/g, "new dashboard implementation"],
     [/다음\s*주\s*금요일\s*오후/g, "next Friday afternoon"],
+    [/다음\s*주\s*수요일/g, "next Wednesday"],
     [/30분\s*미팅\s*요청/g, "request a 30-minute meeting"],
+    [/수정\s*계약서/g, "revised contract"],
+    [/검토\s*의견/g, "review feedback"],
     [/비용/g, "cost"],
     [/일정/g, "timeline"],
     [/필요\s*기능/g, "required features"],
@@ -112,10 +115,31 @@ function translateKnownBusinessKorean(value: string) {
     .trim();
 }
 
+function translateKnownBusinessEnglishToKorean(value: string) {
+  const replacements: Array<[RegExp, string]> = [
+    [/please\s+let\s+us\s+know\s+if\s+you\s+can\s+share\s+/gi, ""],
+    [/updated\s+pricing\s+table/gi, "업데이트된 가격표"],
+    [/pricing\s+table/gi, "가격표"],
+    [/revised\s+proposal/gi, "수정 제안서"],
+    [/revised\s+contract/gi, "수정 계약서"],
+    [/by\s+tomorrow\s+morning/gi, "내일 오전까지"],
+    [/by\s+tomorrow/gi, "내일까지"],
+    [/by\s+friday/gi, "금요일까지"],
+    [/share\s+/gi, "공유"],
+  ];
+
+  return replacements.reduce(
+    (result, [pattern, replacement]) => result.replace(pattern, replacement),
+    value,
+  ).trim();
+}
+
 function cleanKeyPoint(value: string, language: OutputLanguage) {
   const cleaned = cleanInstructionWords(normalizeBizMailMarkerSyntax(value, language));
 
-  return language === "en" ? translateKnownBusinessKorean(cleaned) : cleaned;
+  return language === "en"
+    ? translateKnownBusinessKorean(cleaned)
+    : translateKnownBusinessEnglishToKorean(cleaned);
 }
 
 function uniqueLines(lines: string[]) {
@@ -204,6 +228,8 @@ function resolveTone(
 
 function extractDeadline(text: string, language: OutputLanguage) {
   const candidates = [
+    /by\s+tomorrow\s+morning/i,
+    /by\s+(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday)\s+(?:morning|afternoon)/i,
     /by\s+(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday|tomorrow|today|eod|end of day)/i,
     /by\s+the\s+end\s+of\s+this\s+week/i,
     /this week/i,
@@ -230,6 +256,34 @@ function extractDeadline(text: string, language: OutputLanguage) {
 
 function formatDeadline(value: string, language: OutputLanguage) {
   if (language === "ko") {
+    if (/by\s+tomorrow\s+morning/i.test(value)) {
+      return "내일 오전까지";
+    }
+
+    if (/by\s+tomorrow/i.test(value)) {
+      return "내일까지";
+    }
+
+    if (/by\s+friday/i.test(value)) {
+      return "금요일까지";
+    }
+
+    if (/by\s+(?:this\s+)?monday/i.test(value)) {
+      return "월요일까지";
+    }
+
+    if (/by\s+(?:this\s+)?tuesday/i.test(value)) {
+      return "화요일까지";
+    }
+
+    if (/by\s+(?:this\s+)?wednesday/i.test(value)) {
+      return "수요일까지";
+    }
+
+    if (/by\s+(?:this\s+)?thursday/i.test(value)) {
+      return "목요일까지";
+    }
+
     return value;
   }
 
@@ -286,6 +340,10 @@ function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: Out
       return "the new dashboard implementation";
     }
 
+    if (/수정\s*계약서|revised contract/i.test(text)) {
+      return "the revised contract";
+    }
+
     if (/(견적서|견적|비용|가격)/.test(text)) {
       return "the quotation";
     }
@@ -323,12 +381,34 @@ function inferTopic(input: MailFormInput, analysis: DraftAnalysis, language: Out
     return "자료 전달 지연";
   }
 
+  if (analysis.recommendedTemplateId === "thanks") {
+    if (/긴급\s*요청|클라이언트\s*보고/.test(text)) {
+      return "긴급 요청 지원";
+    }
+
+    return "지원 및 협조";
+  }
+
   if (/(샘플|포장).*(파손|불량)|파손.*(샘플|포장)/.test(text)) {
     return "샘플 포장 파손";
   }
 
   if (/6월\s*캠페인/.test(text)) {
     return "6월 캠페인 진행 상황";
+  }
+
+  const projectMatch = text.match(/프로젝트\s*[A-Za-z0-9가-힣]+/);
+
+  if (projectMatch) {
+    return `${projectMatch[0]} 진행 상황`;
+  }
+
+  if (/마케팅\s*인턴|지원\s*메일|포트폴리오|채용/i.test(text)) {
+    return "마케팅 인턴 지원";
+  }
+
+  if (/updated\s+pricing\s+table|pricing\s+table|가격표/i.test(text)) {
+    return "가격표";
   }
 
   if (/여름\s*캠페인.*협업|협업.*여름\s*캠페인/.test(text)) {
@@ -391,6 +471,48 @@ function getKeyPoints(
   );
   const text = sourceText(input);
 
+  if (language === "en" && /수정\s*계약서|revised contract/i.test(text)) {
+    return uniqueLines([
+      deadlineFromTextForEnglishPoint(text, "Please share review feedback on the revised contract"),
+      ...markerPoints,
+    ]);
+  }
+
+  if (language === "ko" && /updated\s+pricing\s+table|pricing\s+table/i.test(text)) {
+    return uniqueLines([
+      deadlineFromTextForPoint(text, "업데이트된 가격표 공유 가능 여부 확인"),
+      ...markerPoints,
+    ]);
+  }
+
+  if (language === "ko" && analysis.recommendedTemplateId === "thanks") {
+    const thanksPoints = [
+      /긴급\s*요청|도와/i.test(text) ? "긴급 요청에 협조해주신 점" : "",
+      /제시간|보고/i.test(text)
+        ? "도움 덕분에 클라이언트 보고를 제시간에 마무리한 점"
+        : "",
+      /다음에도|앞으로/i.test(text) ? "향후에도 좋은 협업을 이어가고 싶은 마음" : "",
+    ].filter(Boolean);
+
+    if (thanksPoints.length) {
+      return uniqueLines([...thanksPoints, ...markerPoints]);
+    }
+  }
+
+  if (language === "ko" && analysis.recommendedTemplateId === "self-introduction") {
+    const introPoints = [
+      /마케팅\s*인턴/.test(text) ? "마케팅 인턴 포지션 지원" : "",
+      /퍼포먼스\s*광고/.test(text) ? "퍼포먼스 광고 운영 경험 보유" : "",
+      /GA4/.test(text) ? "GA4 활용 가능" : "",
+      /Meta/.test(text) ? "Meta 광고 집행 가능" : "",
+      /포트폴리오/.test(text) ? "포트폴리오 링크 첨부" : "",
+    ].filter(Boolean);
+
+    if (introPoints.length) {
+      return uniqueLines([...introPoints, ...markerPoints]);
+    }
+  }
+
   if (language === "ko" && analysis.recommendedTemplateId === "rejection") {
     const rejectionPoints = [
       /예산/.test(text) ? "이번 분기 예산 문제로 진행이 어려운 상황" : "",
@@ -422,14 +544,26 @@ function getKeyPoints(
   );
 }
 
-function deadlineFromTextForPoint(text: string) {
+function deadlineFromTextForPoint(text: string, fallback = "회신 요청") {
   const deadline = extractDeadline(text, "ko");
 
   if (!deadline) {
-    return "";
+    return fallback;
   }
 
-  return `${koreanDeadlineTarget(deadline)} 회신 요청`;
+  return fallback === "회신 요청"
+    ? `${koreanDeadlineTarget(deadline)} 회신 요청`
+    : `${fallback}: ${koreanDeadlineTarget(deadline)}`;
+}
+
+function deadlineFromTextForEnglishPoint(text: string, fallback: string) {
+  const deadline = extractDeadline(text, "en");
+
+  if (!deadline) {
+    return fallback;
+  }
+
+  return `${fallback} ${deadline}`;
 }
 
 function greeting(input: MailFormInput, language: OutputLanguage, tone: MailTone) {
@@ -551,7 +685,7 @@ function koreanBody(ctx: GenerationContext) {
     rejection: `검토 결과, 아쉽게도 이번에는 진행이 어려울 것 같습니다. 아래 사유와 검토 내용을 함께 전달드립니다.\n${details}`,
     complaint: `현재 확인된 내용은 아래와 같습니다.\n${details}\n\n해당 건에 대해 가능한 조치 방안, 처리 일정, 재발 방지 방안을 회신 부탁드립니다.`,
     report: `현재까지의 핵심 진행 상황은 아래와 같습니다.\n${details}\n\n특이사항은 계속 확인하고 있으며, 다음 액션 진행 상황도 이어서 공유드리겠습니다.`,
-    "self-introduction": `아래 내용을 중심으로 소개드립니다.\n${details}`,
+    "self-introduction": `아래 내용을 중심으로 소개드립니다.\n${details}\n\n관련 자료를 함께 검토해주시면 감사하겠습니다.`,
     "global-business": `요청드릴 내용은 아래와 같습니다.\n${details}`,
     "general-business": `핵심 내용은 아래와 같습니다.\n${details}`,
   };
@@ -570,6 +704,7 @@ function koreanBody(ctx: GenerationContext) {
     proposal: "검토 후 의견 주시면 감사하겠습니다.",
     complaint: "확인 후 빠른 회신 부탁드립니다.",
     report: "추가로 확인이 필요한 사항이 있으시면 말씀 부탁드립니다.",
+    "self-introduction": "추가로 필요한 자료가 있으시면 언제든 말씀 부탁드립니다.",
   };
 
   const paragraphs = [
@@ -590,7 +725,7 @@ function koreanBody(ctx: GenerationContext) {
 }
 
 function englishRequestSentence(templateId: MailTemplateId, topic: string, deadline: string) {
-  const deadlineText = deadline ? ` ${deadline}` : "";
+  const deadlineText = deadline ? ` ${englishDuePhrase(deadline)}` : "";
 
   if (templateId === "quotation-request") {
     return `Could you please let me know if it would be possible to share the quotation${deadlineText}?`;
@@ -605,6 +740,29 @@ function englishRequestSentence(templateId: MailTemplateId, topic: string, deadl
   }
 
   return `I would appreciate it if you could review ${topic} and share your feedback when convenient.`;
+}
+
+function englishDuePhrase(deadline: string) {
+  if (!deadline) {
+    return "";
+  }
+
+  if (/^(by|around|next\s+tuesday\s+or\s+wednesday)/i.test(deadline)) {
+    return deadline;
+  }
+
+  return `by ${deadline}`;
+}
+
+function englishWorkRequestSentence(input: MailFormInput, topic: string, deadline: string) {
+  const text = sourceText(input);
+
+  if (/검토\s*의견|review feedback/i.test(text)) {
+    const due = deadline ? ` ${englishDuePhrase(deadline)}` : "";
+    return `Could you please share your review feedback on ${topic}${due}?`;
+  }
+
+  return englishRequestSentence("work-request", topic, deadline);
 }
 
 function englishAdditionalNotes(input: MailFormInput, details: string) {
@@ -652,7 +810,7 @@ function englishBody(ctx: GenerationContext) {
   };
 
   const actionByTemplate: Record<MailTemplateId, string> = {
-    "work-request": englishRequestSentence(templateId, topic, deadline),
+    "work-request": englishWorkRequestSentence(input, topic, deadline),
     "schedule-adjustment": deadline
       ? `Would you be available around ${deadline}? If not, please feel free to suggest another time that works better for you.`
       : "Please let me know a few time options that would work for your schedule.",

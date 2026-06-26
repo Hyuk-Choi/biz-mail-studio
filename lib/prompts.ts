@@ -46,6 +46,7 @@ export function createSystemPrompt() {
     "- For English emails, use natural global business English instead of literal translation.",
     "- Soften harsh, emotional, or overly casual wording while keeping the intended action clear.",
     "- Do not print raw memo markers such as 必, 有, or 多 in the final body. Convert them into natural business wording.",
+    "- Before returning, self-check that the email has no placeholders, duplicated expressions, mixed-language leftovers, or unsupported facts.",
     "- Return only valid JSON. Do not wrap JSON in markdown.",
   ].join("\n");
 }
@@ -130,9 +131,12 @@ export function buildBusinessMailPrompt(
     "- If details are missing, use general wording in the body and list missing items in missingInfoNotice.",
     "- Provide exactly 3 concise subject lines.",
     "- Provide a send-ready email body with greeting, natural paragraphs, clear action items, and closing.",
+    "- The body must be ready to copy and send: no placeholders like {name}, no raw shorthand, no section labels, and no duplicate phrases such as '까지까지' or '견적 관련 견적'.",
     "- Do not include section headings such as Context, Request, 요청 배경, or 개선 포인트 inside the body.",
-    "- For English, use natural global business expressions such as Could you please review, I would appreciate it if you could, and Please let me know.",
+    "- For English, translate Korean source naturally and do not leave Korean particles or Korean words unless they are proper nouns supplied by the user.",
+    "- For Korean, translate English source naturally and do not leave English request phrases such as Please let us know or by tomorrow.",
     "- For Korean, start with a polite greeting and make the requested action clear without pressuring the recipient.",
+    "- Improvements should explain concrete changes made, including template fit, tone, clarity, marker interpretation, or translation quality.",
     "- Return JSON with analysis, appliedTemplateId, appliedTemplateLabel, subjects, body, improvements, and missingInfoNotice.",
   ].join("\n");
 }
