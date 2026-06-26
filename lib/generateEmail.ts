@@ -175,8 +175,15 @@ function uniqueLines(lines: string[]) {
 }
 
 function titleCase(value: string) {
-  return value.replace(/\w\S*/g, (word) => {
+  const smallWords = new Set(["and", "or", "of", "for", "to", "the", "a", "an"]);
+
+  return value.replace(/\w\S*/g, (word, index) => {
     const lower = word.toLowerCase();
+
+    if (index > 0 && smallWords.has(lower)) {
+      return lower;
+    }
+
     return lower.charAt(0).toUpperCase() + lower.slice(1);
   });
 }
@@ -253,6 +260,8 @@ function extractDeadline(text: string, language: OutputLanguage) {
     /this week/i,
     /이번\s*주\s*(?:월요일|화요일|수요일|목요일|금요일)(?:까지)?/i,
     /다음\s*주\s*(?:월요일|화요일|수요일|목요일|금요일)(?:이나|또는|,|\s)*(?:월요일|화요일|수요일|목요일|금요일)?/i,
+    /오늘\s*(?:오전|오후)\s*\d{1,2}시(?:까지)?/i,
+    /내일\s*(?:오전|오후)\s*\d{1,2}시(?:까지)?/i,
     /오늘\s*(?:오전|오후|중)?/i,
     /내일\s*(?:오전|오후|중)?/i,
     /이번\s*주\s*(?:안으로|안|중|까지)?/i,
@@ -302,7 +311,11 @@ function formatDeadline(value: string, language: OutputLanguage) {
       return "목요일까지";
     }
 
-    return value.replace(/이번주/g, "이번 주").replace(/다음주/g, "다음 주");
+    return value
+      .replace(/이번주/g, "이번 주")
+      .replace(/다음주/g, "다음 주")
+      .replace(/오늘\s*(오전|오후)\s*(\d{1,2}시)/g, "오늘 $1 $2")
+      .replace(/내일\s*(오전|오후)\s*(\d{1,2}시)/g, "내일 $1 $2");
   }
 
   if (/오늘\s*오후/.test(value)) {
@@ -644,7 +657,7 @@ function getKeyPoints(
       /화요일\s*오전/.test(text) ? "화요일 오전 가능" : "",
       /목요일\s*오후/.test(text) ? "목요일 오후 가능" : "",
       /편한\s*시간|가능하신\s*시간/.test(text)
-        ? "상대방의 가능한 시간 확인 요청"
+        ? "위 일정이 어려울 경우 가능한 시간 제안 요청"
         : "",
     ].filter(Boolean);
 
@@ -670,7 +683,7 @@ function getKeyPoints(
       /디자인/.test(text) || /퍼블리싱/.test(text)
         ? "디자인 및 퍼블리싱 포함"
         : "",
-      deadlineFromTextForPoint(text, "견적서 전달 요청"),
+      deadlineLabelFromText(text, "희망 회신 기한"),
       ...markerPoints,
     ].filter(Boolean));
   }
@@ -680,7 +693,7 @@ function getKeyPoints(
       /가격표/.test(text) ? "업데이트된 가격표" : "",
       /제품\s*스펙/.test(text) ? "제품 스펙 자료" : "",
       /제안서/.test(text) ? "제안서 작성에 활용 예정" : "",
-      deadlineFromTextForPoint(text, "자료 공유 요청"),
+      deadlineLabelFromText(text, "희망 공유 기한"),
       ...markerPoints,
     ].filter(Boolean));
   }
@@ -698,7 +711,8 @@ function getKeyPoints(
 
   if (language === "ko" && /updated\s+pricing\s+table|pricing\s+table/i.test(text)) {
     return uniqueLines([
-      deadlineFromTextForPoint(text, "업데이트된 가격표 공유 가능 여부 확인"),
+      "업데이트된 가격표 공유 가능 여부 확인",
+      deadlineLabelFromText(text, "희망 공유 기한"),
       ...markerPoints,
     ]);
   }
@@ -747,7 +761,7 @@ function getKeyPoints(
   if (language === "ko" && analysis.recommendedTemplateId === "reply-reminder") {
     const reminderPoints = [
       /제안서/.test(text) ? "지난주 전달한 제안서 검토 의견 확인" : "",
-      deadlineFromTextForPoint(text),
+      deadlineLabelFromText(text, "희망 회신 기한"),
     ].filter(Boolean);
 
     if (reminderPoints.length) {
@@ -772,6 +786,12 @@ function deadlineFromTextForPoint(text: string, fallback = "회신 요청") {
   return fallback === "회신 요청"
     ? `${koreanDeadlineTarget(deadline)} 회신 요청`
     : `${fallback}: ${koreanDeadlineTarget(deadline)}`;
+}
+
+function deadlineLabelFromText(text: string, label: string) {
+  const deadline = extractDeadline(text, "ko");
+
+  return deadline ? `${label}: ${koreanDeadlineTarget(deadline)}` : "";
 }
 
 function deadlineFromTextForEnglishPoint(text: string, fallback: string) {
@@ -883,7 +903,7 @@ function koreanBody(ctx: GenerationContext) {
       ? `미팅에서는 아래 내용을 중심으로 논의하고자 합니다.\n${details}\n\n가능하시다면 ${meetingWindow} 미팅 가능 여부를 회신 부탁드립니다.`
       : `미팅에서는 아래 내용을 중심으로 논의하고자 합니다.\n${details}\n\n가능하신 일정이 있으시면 회신 부탁드립니다.`,
     "meeting-follow-up": `주요 논의 내용과 후속 액션은 아래와 같습니다.\n${details}\n\n각 항목의 진행 상황은 다음 확인 시점에 맞춰 다시 점검하겠습니다.`,
-    proposal: `제안드리는 주요 내용은 아래와 같습니다.\n${details}\n\n검토 후 의견을 주시면 구체적인 진행 방식과 일정을 추가로 조율하겠습니다.`,
+    proposal: `제안드리는 주요 내용은 아래와 같습니다.\n${details}\n\n관심 있으시면 구체적인 진행 방식과 일정을 추가로 조율하겠습니다.`,
     collaboration: `협업 방향은 아래와 같이 생각하고 있습니다.\n${details}\n\n관심 있으시다면 다음 단계 논의를 위한 미팅 가능 일정을 알려주시면 감사하겠습니다.`,
     "quotation-request": deadlineTarget
       ? `아래 조건을 기준으로 견적서 전달 가능 여부를 ${deadlineTarget} 회신 부탁드립니다.\n${details}`
@@ -917,7 +937,7 @@ function koreanBody(ctx: GenerationContext) {
     "reply-reminder": "확인 부탁드리며, 회신 기다리겠습니다.",
     "work-request": "확인 후 진행 가능 여부를 회신해주시면 감사하겠습니다.",
     collaboration: "검토 부탁드리며, 가능하신 일정이나 의견을 회신 부탁드립니다.",
-    proposal: "긍정적인 검토 부탁드립니다.",
+    proposal: "검토 후 의견을 공유해주시면 감사하겠습니다.",
     complaint: "확인 후 빠른 회신 부탁드립니다.",
     report: "추가로 확인이 필요한 사항이 있으시면 말씀 부탁드립니다.",
     "self-introduction": "추가로 필요한 자료가 있으시면 언제든 말씀 부탁드립니다.",
@@ -1120,6 +1140,14 @@ function buildSubjects(ctx: GenerationContext) {
         "Quotation Request",
         "Request for Pricing Information",
         "Quotation Inquiry",
+      ];
+    }
+
+    if (templateId === "global-business" && /shipment schedule and invoice/i.test(enTopic)) {
+      return [
+        "Request for Updated Shipment Schedule and Invoice",
+        "Shipment Schedule and Invoice Confirmation",
+        "Follow-up on Shipment Schedule and Invoice",
       ];
     }
 
