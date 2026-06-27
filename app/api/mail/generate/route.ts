@@ -3,13 +3,59 @@ import { generateBusinessMail } from "@/lib/generateEmail";
 import { generateOpenAIEmail } from "@/lib/openaiEmail";
 import type {
   GenerateEmailOptions,
+  LanguageMode,
   MailRefinementAction,
   MailFormInput,
   MailGenerationRequest,
   MailGenerationResponse,
+  MailTemplateId,
+  MailTone,
+  TemplateMode,
 } from "@/types/mail";
 
 export const runtime = "nodejs";
+
+const templateModes = new Set<TemplateMode>(["auto", "manual"]);
+
+const templateIds = new Set<MailTemplateId>([
+  "work-request",
+  "schedule-adjustment",
+  "meeting-request",
+  "meeting-follow-up",
+  "proposal",
+  "collaboration",
+  "quotation-request",
+  "document-request",
+  "reply-reminder",
+  "thanks",
+  "apology",
+  "rejection",
+  "complaint",
+  "report",
+  "self-introduction",
+  "global-business",
+  "general-business",
+]);
+
+const languageModes = new Set<LanguageMode>([
+  "auto",
+  "ko",
+  "en",
+  "ko-to-en",
+  "en-to-ko",
+]);
+
+const toneIds = new Set<MailTone>([
+  "auto",
+  "polite",
+  "concise",
+  "soft",
+  "firm",
+  "persuasive",
+  "friendly-professional",
+  "formal",
+  "global-business",
+]);
 
 const refinementActions = new Set<MailRefinementAction>([
   "more_polite",
@@ -30,6 +76,13 @@ function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === "string";
 }
 
+function isAllowedValue<T extends string>(
+  value: unknown,
+  allowedValues: Set<T>,
+): value is T {
+  return typeof value === "string" && allowedValues.has(value as T);
+}
+
 function isMailFormInput(value: unknown): value is MailFormInput {
   if (!value || typeof value !== "object") {
     return false;
@@ -39,10 +92,11 @@ function isMailFormInput(value: unknown): value is MailFormInput {
 
   return (
     isString(input.rawDraft) &&
-    isString(input.templateMode) &&
-    isOptionalString(input.selectedTemplateId) &&
-    isString(input.languageMode) &&
-    isString(input.tone) &&
+    isAllowedValue(input.templateMode, templateModes) &&
+    (input.selectedTemplateId === undefined ||
+      isAllowedValue(input.selectedTemplateId, templateIds)) &&
+    isAllowedValue(input.languageMode, languageModes) &&
+    isAllowedValue(input.tone, toneIds) &&
     isOptionalString(input.recipient) &&
     isOptionalString(input.sender) &&
     isOptionalString(input.purpose) &&
