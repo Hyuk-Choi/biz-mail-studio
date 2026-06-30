@@ -1,10 +1,10 @@
 # BizMail Studio
 
-BizMail Studio는 사용자가 말하듯 작성한 메일 초안이나 메모를 분석해 적절한 비즈니스 메일 폼을 자동 추천하고, 한국어/영어 비즈니스 메일 완성본으로 재작성해주는 AI 기반 메일 리라이팅 웹앱입니다.
+BizMail Studio는 사용자가 말하듯 작성한 메일 초안이나 메모를 분석해 적절한 비즈니스 메일 폼을 자동 추천하고, 한국어/영어 비즈니스 메일 완성본으로 재작성해주는 AI 분석형 메일 리라이팅 웹앱입니다.
 
 ## 앱 소개
 
-사용자가 “자료 늦게 보내서 죄송하다고 하고 오늘 오후까지 다시 보내겠다고 말해줘”처럼 대충 입력해도 메일 의도, 받는 사람 유형, 긴급도, 추천 톤, 누락 정보를 분석한 뒤 사과 메일, 일정 조율 메일, 회신 독촉 메일 등 적절한 폼으로 변환합니다.
+사용자가 “자료 늦게 보내서 죄송하다고 하고 오늘 오후까지 다시 보내겠다고 말해줘”처럼 대충 입력해도 메일 의도, 받는 사람 유형, 긴급도, 추천 톤, 누락 정보를 분석한 뒤 사과 메일, 일정 조율 메일, 회신 독촉 메일 등 적절한 폼으로 변환합니다. 현재 포트폴리오 모드는 외부 API를 호출하지 않고 mock 지식 베이스, 규칙 기반 추론, 가중치 점수 엔진으로 결과를 생성합니다.
 
 ## 주요 기능
 
@@ -20,6 +20,10 @@ BizMail Studio는 사용자가 말하듯 작성한 메일 초안이나 메모를
 - 영어 초안의 한국어 비즈니스 메일 변환
 - 톤 선택: 자동 추천, 정중한, 간결한, 부드러운, 단호한, 설득력 있는, 친근하지만 전문적인, 격식 있는, 글로벌 비즈니스 스타일
 - 추천 제목 3개, 완성된 메일 본문, 개선 포인트, 누락 정보 안내 생성
+- mock 지식 베이스 기반 분석 결과: 총점, 신뢰도, 판단 근거, 문제 가능성, 추천 보완 제공
+- 가중치 점수 엔진: 상황 적합도, 수신자 적합도, 메시지 명확도, 회신/전환 가능성, 커뮤니케이션 효율, 실행 용이성 평가
+- 내부 시뮬레이션 기준 및 우선 액션 플랜 제공
+- 바로 활용 가능한 대체 문장, 다음 테스트 아이디어, TXT 저장 지원
 - 결과 재작성 옵션: 더 정중하게, 더 짧게, 더 명확하게, 더 부드럽게, 더 단호하게, 영어로 바꾸기, 한국어로 바꾸기, 다시 생성
 - 결과 복사 및 복사 완료 피드백
 - 현재 포트폴리오/데모 모드는 mock 생성 로직으로 동작
@@ -31,7 +35,9 @@ BizMail Studio는 사용자가 말하듯 작성한 메일 초안이나 메모를
 - TypeScript
 - React
 - Tailwind CSS
-- OpenAI API
+- Next.js API Route
+- mock/rule-based analysis engine
+- OpenAI API는 선택적 확장 영역
 
 ## 실행 방법
 
@@ -121,7 +127,7 @@ MAIL_GENERATION_PROVIDER=mock
 
 5. Deploy를 실행합니다.
 
-OpenAI API로 전환할 때만 아래 값을 추가하고 `MAIL_GENERATION_PROVIDER=openai`로 변경합니다.
+현재 배포는 mock 모드만으로 동작합니다. OpenAI API로 전환할 때만 아래 값을 추가하고 `MAIL_GENERATION_PROVIDER=openai`로 변경합니다.
 
 ```bash
 OPENAI_API_KEY=your_openai_api_key
@@ -180,7 +186,7 @@ OPENAI_MODEL=gpt-4o-mini
 
 환경변수 설명:
 
-- `MAIL_GENERATION_PROVIDER`: 현재는 `mock`으로 사용합니다. `openai`로 바꾸면 서버에서 OpenAI API를 호출합니다.
+- `MAIL_GENERATION_PROVIDER`: 현재는 `mock`으로 사용합니다. `openai`를 명시하고 API Key가 있을 때만 서버에서 OpenAI API를 호출합니다.
 - `OPENAI_API_KEY`: OpenAI API 호출에 사용하는 서버 전용 키입니다. mock 모드에서는 필요 없습니다.
 - `OPENAI_MODEL`: 사용할 OpenAI 모델명입니다. mock 모드에서는 필요 없습니다.
 
@@ -195,22 +201,34 @@ app/
   layout.tsx                   # 루트 레이아웃
   page.tsx                     # 메인 앱 화면
 components/
+  ActionPlan.tsx               # 우선 액션 플랜
+  AnalysisResultCard.tsx       # mock 분석 결과 카드
   CaseCards.tsx                # 메일 케이스 소개 카드
   CopyButton.tsx               # 클립보드 복사 버튼
   Header.tsx                   # 앱 헤더
+  InsightList.tsx              # 인사이트/문제/추천 리스트
   MailForm.tsx                 # 입력 폼
   MailResult.tsx               # 결과 출력 영역
+  ScoreBreakdown.tsx           # 점수 상세 바
   TemplateSelector.tsx         # 비즈니스 메일 폼 선택 UI
 data/
+  benchmarkData.ts             # 내부 시뮬레이션 기준 데이터
+  copyTemplates.ts             # 대체 문장 템플릿
   mailOptions.ts               # 메일 케이스, 언어, 톤 옵션
   mailTemplates.ts             # 메일 폼별 구조, 가이드, 예시 데이터
+  mockKnowledgeBase.ts         # mock 지식 베이스
 lib/
   analyzeDraft.ts              # 초안 분석 및 메일 폼 자동 추천 로직
   generateEmail.ts             # 분석 결과 기반 mock 메일 생성기
   mailApiClient.ts             # 클라이언트 API 호출 함수
   openaiEmail.ts               # 서버 전용 OpenAI 호출 함수
   prompts.ts                   # OpenAI 프롬프트 생성 함수
+  recommendationEngine.ts      # 추천/액션/테스트 아이디어 생성 로직
+  resultGenerator.ts           # 분석 결과 오케스트레이션
+  scoringEngine.ts             # 가중치 기반 점수 엔진
+  textVariation.ts             # deterministic variation 유틸
 types/
+  analysis.ts                  # 분석 결과 타입 정의
   mail.ts                      # 메일 관련 타입 정의
 Dockerfile                     # Docker 배포 설정
 render.yaml                    # Render 배포 설정
@@ -225,9 +243,11 @@ vercel.json                    # Vercel 배포 설정
 - 본문 특정 문단만 재작성하기
 - Gmail, Outlook 복사/연동 워크플로우
 - 팀별 브랜드 톤 가이드 적용
+- 사용자별 업종/수신자 톤 프리셋
+- OpenAI API 선택 연동 및 사용량 제한
 - 스트리밍 응답 UI
 - 사용량 제한 및 인증 기능
 
 ## 포트폴리오용 소개 문구
 
-“BizMail Studio는 사용자의 간단한 초안과 상황 정보를 바탕으로 한국어/영어 비즈니스 메일을 자동 생성해주는 AI 기반 메일 리라이팅 웹앱입니다. 케이스별 메일 구조, 톤 선택, 언어 변환, 개선 포인트 제공 기능을 통해 실무 커뮤니케이션 효율을 높이는 것을 목표로 개발했습니다.”
+“BizMail Studio는 사용자의 간단한 초안과 상황 정보를 바탕으로 한국어/영어 비즈니스 메일을 자동 생성해주는 AI 분석형 메일 리라이팅 웹앱입니다. 케이스별 메일 구조, 톤 선택, 언어 변환, mock 지식 베이스 기반 개선 포인트와 액션 플랜 제공 기능을 통해 실무 커뮤니케이션 효율을 높이는 것을 목표로 개발했습니다.”

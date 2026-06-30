@@ -1,3 +1,5 @@
+import type { AnalysisResult } from "@/types/analysis";
+
 export type MailCase =
   | "work_request"
   | "schedule_coordination"
@@ -114,6 +116,7 @@ export type GeneratedMailResult = {
   body: string;
   improvements: string[];
   missingInfoNotice: string[];
+  analysisResult?: AnalysisResult;
 };
 
 export interface GenerateEmailOptions {

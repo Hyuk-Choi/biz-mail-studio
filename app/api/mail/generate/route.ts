@@ -158,11 +158,11 @@ export async function POST(request: Request) {
   }
 
   const options = cleanOptions(payload.options);
-  const forceMock = process.env.MAIL_GENERATION_PROVIDER === "mock";
+  const useOpenAI = process.env.MAIL_GENERATION_PROVIDER === "openai";
   const hasApiKey = Boolean(process.env.OPENAI_API_KEY);
 
   try {
-    if (forceMock || !hasApiKey) {
+    if (!useOpenAI || !hasApiKey) {
       const data = await generateBusinessMail(payload.input, options);
 
       return NextResponse.json<MailGenerationResponse>({

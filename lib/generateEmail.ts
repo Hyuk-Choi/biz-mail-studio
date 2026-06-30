@@ -5,6 +5,7 @@ import {
   formatBizMailMarkerInsight,
   normalizeBizMailMarkerSyntax,
 } from "@/lib/bizMailMarkers";
+import { generateAnalysisResult } from "@/lib/resultGenerator";
 import type {
   DraftAnalysis,
   GenerateEmailOptions,
@@ -654,6 +655,9 @@ function getKeyPoints(
 
   if (language === "ko" && analysis.recommendedTemplateId === "schedule-adjustment") {
     const schedulePoints = [
+      /다음\s*주\s*화요일(?:이나|또는|,|\s)*수요일/.test(text)
+        ? "다음 주 화요일 또는 수요일"
+        : "",
       /화요일\s*오전/.test(text) ? "화요일 오전 가능" : "",
       /목요일\s*오후/.test(text) ? "목요일 오후 가능" : "",
       /편한\s*시간|가능하신\s*시간/.test(text)
@@ -672,6 +676,14 @@ function getKeyPoints(
       /첫 구매\s*7일/.test(text) ? "첫 구매 7일 후 쿠폰 메시지 발송" : "",
       /재구매율/.test(text) ? "재구매율 개선 기대" : "",
       /검토/.test(text) ? "제안 내용 검토 요청" : "",
+      ...markerPoints,
+    ].filter(Boolean));
+  }
+
+  if (language === "ko" && analysis.recommendedTemplateId === "collaboration" && /신규\s*캠페인/.test(text)) {
+    return uniqueLines([
+      "신규 캠페인 관련 협업 제안",
+      /관심|미팅/.test(text) ? "관심 시 다음 주 중 짧은 미팅 요청" : "",
       ...markerPoints,
     ].filter(Boolean));
   }
@@ -715,6 +727,18 @@ function getKeyPoints(
       deadlineLabelFromText(text, "희망 공유 기한"),
       ...markerPoints,
     ]);
+  }
+
+  if (language === "ko" && analysis.recommendedTemplateId === "complaint" && /샘플.*파손|파손.*샘플/.test(text)) {
+    return uniqueLines([
+      "샘플 포장 파손 문제 발생",
+      /클라이언트.*불편|불편.*클라이언트/.test(text)
+        ? "클라이언트 불편 발생"
+        : "",
+      /교환/.test(text) ? "교환 가능 여부 확인 요청" : "",
+      /재발\s*방지/.test(text) ? "재발 방지 방안 회신 요청" : "",
+      ...markerPoints,
+    ].filter(Boolean));
   }
 
   if (language === "ko" && analysis.recommendedTemplateId === "thanks") {
@@ -1030,7 +1054,7 @@ function englishMeetingAvailabilitySentence(input: MailFormInput, deadline: stri
   return "Please let me know a few time options that would work for your schedule.";
 }
 
-function englishAdditionalNotes(input: MailFormInput, details: string) {
+function englishAdditionalNotes(input: MailFormInput) {
   const text = sourceText(input);
   const notes = [
     /pre-?review|사전\s*검수/i.test(text)
@@ -1045,13 +1069,15 @@ function englishAdditionalNotes(input: MailFormInput, details: string) {
     return notes.join("\n");
   }
 
-  return details;
+  return "";
 }
 
 function englishBody(ctx: GenerationContext) {
   const { input, templateId, topic, deadline, keyPoints, tone } = ctx;
   const details = bulletList(keyPoints, "en");
-  const additionalNotes = englishAdditionalNotes(input, details);
+  const additionalNotes = englishAdditionalNotes(input);
+  const documentDetails =
+    additionalNotes || keyPoints.length > 1 ? additionalNotes || details : "";
   const short = tone === "concise";
 
   const introByTemplate: Record<MailTemplateId, string> = {
@@ -1084,7 +1110,9 @@ function englishBody(ctx: GenerationContext) {
     proposal: `The key points of the proposal are as follows:\n${details}`,
     collaboration: `The potential collaboration could be structured around the following points:\n${details}`,
     "quotation-request": englishRequestSentence(templateId, topic, deadline),
-    "document-request": `${englishRequestSentence(templateId, topic, deadline)}\n\nPlease also note the following:\n${additionalNotes}`,
+    "document-request": documentDetails
+      ? `${englishRequestSentence(templateId, topic, deadline)}\n\nPlease also note the following:\n${documentDetails}`
+      : englishRequestSentence(templateId, topic, deadline),
     "reply-reminder": englishRequestSentence(templateId, topic, deadline),
     thanks: `I especially appreciate the following:\n${details}`,
     apology: deadline
@@ -1313,17 +1341,21 @@ export async function generateBusinessMail(
   const missingInfoNotice = ctx.analysis.missingInfo.length
     ? ctx.analysis.missingInfo
     : ["추가로 필요한 정보가 없습니다."];
+  const baseResult: Omit<GeneratedMailResult, "analysisResult"> = {
+    analysis: ctx.analysis,
+    appliedTemplateId: ctx.templateId,
+    appliedTemplateLabel: template.label,
+    subjects: buildSubjects(ctx),
+    body,
+    improvements: buildImprovements(ctx),
+    missingInfoNotice,
+  };
 
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
-        analysis: ctx.analysis,
-        appliedTemplateId: ctx.templateId,
-        appliedTemplateLabel: template.label,
-        subjects: buildSubjects(ctx),
-        body,
-        improvements: buildImprovements(ctx),
-        missingInfoNotice,
+        ...baseResult,
+        analysisResult: generateAnalysisResult(input, baseResult, options),
       });
     }, 450);
   });

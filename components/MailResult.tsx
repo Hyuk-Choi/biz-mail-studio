@@ -1,5 +1,6 @@
 "use client";
 
+import AnalysisResultCard from "@/components/AnalysisResultCard";
 import CopyButton from "@/components/CopyButton";
 import { toneOptions } from "@/data/mailOptions";
 import type { GeneratedMailResult, MailRefinementAction } from "@/types/mail";
@@ -36,6 +37,29 @@ function toneLabel(tone: string) {
 }
 
 function formatResultForCopy(result: GeneratedMailResult) {
+  const analysisResult = result.analysisResult
+    ? [
+        "",
+        "AI 분석형 결과",
+        `요약: ${result.analysisResult.summary}`,
+        `총점: ${result.analysisResult.totalScore}`,
+        `신뢰도: ${result.analysisResult.confidenceLevel}`,
+        "",
+        "핵심 인사이트",
+        ...result.analysisResult.keyInsights.map((point) => `- ${point}`),
+        "",
+        "우선 액션",
+        ...result.analysisResult.priorityActions.map(
+          (action) => `- [${action.priority}] ${action.action}: ${action.reason}`,
+        ),
+        "",
+        "바로 활용 가능한 문장",
+        ...result.analysisResult.generatedCopy.map((copy) => `- ${copy}`),
+        "",
+        `주의: ${result.analysisResult.caution}`,
+      ]
+    : [];
+
   return [
     "입력 내용 분석 결과",
     `목적: ${result.analysis.detectedPurpose}`,
@@ -53,6 +77,7 @@ function formatResultForCopy(result: GeneratedMailResult) {
     "",
     "누락 정보",
     ...result.missingInfoNotice.map((point, index) => `${index + 1}. ${point}`),
+    ...analysisResult,
   ].join("\n");
 }
 
@@ -148,6 +173,8 @@ export default function MailResult({
               />
             </div>
           </div>
+
+          <AnalysisResultCard result={result.analysisResult} />
 
           <div>
             <h3 className="text-sm font-semibold text-slate-700">
